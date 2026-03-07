@@ -1,0 +1,361 @@
+import React, { useMemo, useState } from 'react';
+import { useStore } from '../store';
+import { TrendingUp, Package, DollarSign, Calendar, BarChart3, ArrowUpRight, ArrowDownRight, Filter, Building2, Printer, Check, Clock } from 'lucide-react';
+import { 
+  format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, 
+  startOfYear, endOfYear, isAfter, isBefore, parseISO, isWithinInterval,
+  subWeeks, subMonths, subYears, startOfDay, endOfDay
+} from 'date-fns';
+import { printReport } from '../lib/exportUtils';
+import { cn } from '../lib/utils';
+
+export default function Reports() {
+  const { revenueReports, inventoryReports, branches, inventoryItems } = useStore();
+  const [selectedProduct, setSelectedProduct] = useState<string>('all');
+  const [selectedBranches, setSelectedBranches] = useState<string[]>(['all']);
+  const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear'>('thisMonth');
+
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    switch (dateFilter) {
+      case 'today':
+        return { start: startOfDay(now), end: endOfDay(now) };
+      case 'yesterday':
+        const yesterday = subDays(now, 1);
+        return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+      case 'thisWeek':
+        return { start: startOfWeek(now, { weekStartsOn: 6 }), end: endOfDay(now) };
+      case 'lastWeek':
+        const lastWeek = subWeeks(now, 1);
+        return { start: startOfWeek(lastWeek, { weekStartsOn: 6 }), end: endOfWeek(lastWeek, { weekStartsOn: 6 }) };
+      case 'thisMonth':
+        return { start: startOfMonth(now), end: endOfDay(now) };
+      case 'lastMonth':
+        const lastMonth = subMonths(now, 1);
+        return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+      case 'thisYear':
+        return { start: startOfYear(now), end: endOfDay(now) };
+      case 'lastYear':
+        const lastYear = subYears(now, 1);
+        return { start: startOfYear(lastYear), end: endOfYear(lastYear) };
+      default:
+        return { start: startOfMonth(now), end: endOfDay(now) };
+    }
+  }, [dateFilter]);
+
+  const stats = useMemo(() => {
+    const filteredRevenue = revenueReports.filter(r => {
+      const date = parseISO(r.date);
+      const inRange = isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
+      const inBranch = selectedBranches.includes('all') || selectedBranches.includes(r.branchId);
+      return inRange && inBranch;
+    });
+
+    const filteredInventory = inventoryReports.filter(r => {
+      const date = parseISO(r.date);
+      const inRange = isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
+      const inBranch = selectedBranches.includes('all') || selectedBranches.includes(r.branchId);
+      return inRange && inBranch;
+    });
+
+    // Revenue Calculations
+    const totalRevenue = filteredRevenue.reduce((sum, r) => 
+      sum + r.shifts.reduce((sSum, s) => sSum + s.cash + s.pos + s.delivery, 0), 0);
+    
+    const daysDiff = Math.max(1, Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Inventory Consumption Calculations
+    const totalConsumption = filteredInventory.reduce((sum, r) => 
+      sum + r.items
+        .filter(i => selectedProduct === 'all' || i.itemId === selectedProduct)
+        .reduce((iSum, i) => iSum + i.consumption, 0), 0);
+
+    return {
+      revenue: {
+        total: totalRevenue,
+        daily: totalRevenue / daysDiff,
+      },
+      consumption: {
+        total: totalConsumption,
+        daily: totalConsumption / daysDiff,
+      },
+      days: daysDiff
+    };
+  }, [revenueReports, inventoryReports, selectedBranches, selectedProduct, dateRange]);
+
+  const toggleBranch = (id: string) => {
+    if (id === 'all') {
+      setSelectedBranches(['all']);
+      return;
+    }
+    
+    const newBranches = selectedBranches.filter(b => b !== 'all');
+    if (newBranches.includes(id)) {
+      const filtered = newBranches.filter(b => b !== id);
+      setSelectedBranches(filtered.length === 0 ? ['all'] : filtered);
+    } else {
+      setSelectedBranches([...newBranches, id]);
+    }
+  };
+
+  const handlePrint = () => {
+    const productName = selectedProduct === 'all' ? 'كافة المنتجات' : inventoryItems.find(i => i.id === selectedProduct)?.name;
+    const branchNames = selectedBranches.includes('all') ? 'كافة الفروع' : branches.filter(b => selectedBranches.includes(b.id)).map(b => b.name).join(', ');
+    const dateRangeStr = `${format(dateRange.start, 'yyyy-MM-dd')} إلى ${format(dateRange.end, 'yyyy-MM-dd')}`;
+
+    const content = `
+      <div dir="rtl" style="font-family: sans-serif; padding: 20px;">
+        <h1 style="text-align: center; color: #4f46e5;">تقرير الأداء والتحليلات</h1>
+        <div style="margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+          <p><strong>الفروع:</strong> ${branchNames}</p>
+          <p><strong>المنتج:</strong> ${productName}</p>
+          <p><strong>الفترة:</strong> ${dateRangeStr}</p>
+          <p><strong>تاريخ الاستخراج:</strong> ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+          <div>
+            <h2 style="color: #059669; border-right: 4px solid #059669; padding-right: 10px;">الإيرادات</h2>
+            <p><strong>الإجمالي للفترة:</strong> ${stats.revenue.total.toLocaleString()} ر.س</p>
+            <p><strong>المتوسط اليومي:</strong> ${stats.revenue.daily.toLocaleString()} ر.س</p>
+          </div>
+          <div>
+            <h2 style="color: #2563eb; border-right: 4px solid #2563eb; padding-right: 10px;">الاستهلاك</h2>
+            <p><strong>الإجمالي للفترة:</strong> ${stats.consumption.total.toLocaleString()} وحدة</p>
+            <p><strong>المتوسط اليومي:</strong> ${stats.consumption.daily.toLocaleString()} وحدة</p>
+          </div>
+        </div>
+      </div>
+    `;
+    printReport(content);
+  };
+
+  return (
+    <div className="space-y-8" dir="rtl">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">التقارير والتحليلات</h1>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handlePrint}
+            className="flex items-center gap-2 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 px-4 py-2 rounded-xl border border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Printer size={18} />
+            <span>طباعة</span>
+          </button>
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-gray-100 dark:border-slate-800">
+            <Calendar size={16} />
+            <span>آخر تحديث: {format(new Date(), 'yyyy-MM-dd HH:mm')}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={18} className="text-indigo-600" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">الفترة الزمنية</h3>
+          </div>
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value as any)}
+            className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="today">اليوم</option>
+            <option value="yesterday">أمس</option>
+            <option value="thisWeek">هذا الأسبوع</option>
+            <option value="lastWeek">الأسبوع الماضي</option>
+            <option value="thisMonth">هذا الشهر</option>
+            <option value="lastMonth">الشهر الماضي</option>
+            <option value="thisYear">هذا العام</option>
+            <option value="lastYear">العام الماضي</option>
+          </select>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Building2 size={18} className="text-indigo-600" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">تصفية حسب الفروع</h3>
+          </div>
+          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
+            <button
+              onClick={() => toggleBranch('all')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
+                selectedBranches.includes('all')
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                  : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+              )}
+            >
+              {selectedBranches.includes('all') && <Check size={12} />}
+              كافة الفروع
+            </button>
+            {branches.map(branch => (
+              <button
+                key={branch.id}
+                onClick={() => toggleBranch(branch.id)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
+                  selectedBranches.includes(branch.id)
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                    : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                )}
+              >
+                {selectedBranches.includes(branch.id) && <Check size={12} />}
+                {branch.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Package size={18} className="text-indigo-600" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">تصفية حسب المنتج</h3>
+          </div>
+          <select
+            value={selectedProduct}
+            onChange={(e) => setSelectedProduct(e.target.value)}
+            className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="all">كافة المنتجات</option>
+            {inventoryItems.map(item => (
+              <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Revenue Section */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
+            <DollarSign size={20} />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">متوسط الإيرادات</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ReportCard 
+            title="إجمالي الإيرادات" 
+            value={stats.revenue.total} 
+            subtitle={`إجمالي الفترة (${stats.days} يوم)`}
+            icon={<DollarSign size={24} />}
+            color="emerald"
+          />
+          <ReportCard 
+            title="المتوسط اليومي" 
+            value={stats.revenue.daily} 
+            subtitle="متوسط الإيراد لكل يوم"
+            icon={<BarChart3 size={24} />}
+            color="indigo"
+          />
+          <ReportCard 
+            title="نطاق الفترة" 
+            value={stats.days} 
+            subtitle="عدد الأيام المختارة"
+            icon={<Calendar size={24} />}
+            color="amber"
+            isCount
+          />
+        </div>
+      </section>
+
+      {/* Consumption Section */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+            <Package size={20} />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">تحليل الاستهلاك</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ReportCard 
+            title="إجمالي الاستهلاك" 
+            value={stats.consumption.total} 
+            subtitle={`إجمالي الفترة (${stats.days} يوم)`}
+            icon={<Package size={24} />}
+            color="blue"
+          />
+          <ReportCard 
+            title="المتوسط اليومي" 
+            value={stats.consumption.daily} 
+            subtitle="متوسط الاستهلاك لكل يوم"
+            icon={<BarChart3 size={24} />}
+            color="violet"
+          />
+          <ReportCard 
+            title="كفاءة التوريد" 
+            value={100} 
+            subtitle="نسبة توفر المنتج"
+            icon={<TrendingUp size={24} />}
+            color="rose"
+            isPercent
+          />
+        </div>
+      </section>
+
+      {/* Detailed Breakdown (Optional Placeholder) */}
+      <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white">
+            <BarChart3 size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">نظرة عامة على الأداء</h3>
+            <p className="text-gray-500 dark:text-slate-400 text-sm">تحليل البيانات التاريخية للفروع</p>
+          </div>
+        </div>
+        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-2xl">
+          <p className="text-gray-400 dark:text-slate-600 italic">سيتم إضافة رسوم بيانية تفصيلية هنا قريباً</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportCard({ title, value, subtitle, icon, color, isPercent, isCount }: { 
+  title: string, 
+  value: number, 
+  subtitle: string, 
+  icon: React.ReactNode,
+  color: string,
+  isPercent?: boolean,
+  isCount?: boolean
+}) {
+  const colorClasses: Record<string, string> = {
+    emerald: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20',
+    indigo: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20',
+    amber: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20',
+    blue: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20',
+    violet: 'text-violet-600 bg-violet-50 dark:bg-violet-900/20',
+    rose: 'text-rose-600 bg-rose-50 dark:bg-rose-900/20',
+  };
+
+  const unit = isPercent ? '%' : isCount ? 'يوم' : (title.includes('إيراد') ? 'ر.س' : 'وحدة');
+
+  return (
+    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start mb-4">
+        <div className={`p-3 rounded-2xl ${colorClasses[color]}`}>
+          {icon}
+        </div>
+        <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold">
+          <ArrowUpRight size={14} />
+          <span>+12%</span>
+        </div>
+      </div>
+      <h3 className="text-gray-500 dark:text-slate-400 text-sm font-bold mb-1">{title}</h3>
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-2xl font-black text-gray-900 dark:text-white">
+          {value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        </span>
+        <span className="text-xs text-gray-400 dark:text-slate-500 font-bold">
+          {unit}
+        </span>
+      </div>
+      <p className="text-xs text-gray-400 dark:text-slate-500">{subtitle}</p>
+    </div>
+  );
+}
