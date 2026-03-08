@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, ShiftRevenue } from '../store';
-import { Plus, Trash2, DollarSign, CreditCard, Truck, User, Download, Filter, Calendar, Building2, Save, FileText, Eye, Printer, X } from 'lucide-react';
+import { Plus, Trash2, DollarSign, CreditCard, Truck, User, Download, Filter, Calendar, Building2, Save, FileText, Eye, Printer, X, Edit, FileEdit } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
 import { getDefaultReportDate } from '../lib/dateUtils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { cn } from '../lib/utils';
 
 export default function Revenue() {
-  const { currentUser, customRoles, branches, revenueReports, revenueDrafts, addRevenueReport, deleteRevenueReport, saveRevenueDraft } = useStore();
+  const { currentUser, customRoles, branches, revenueReports, addRevenueReport, updateRevenueReport, deleteRevenueReport, addNotification, restoreRevenueReport } = useStore();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   
   // Form State
@@ -24,17 +26,19 @@ export default function Revenue() {
   });
   const [filterBranch, setFilterBranch] = useState('all');
 
-  // Load draft if exists
+  // Load report data when editing
   useEffect(() => {
-    if (isAdding) {
-      const draft = revenueDrafts.find(d => d.branchId === branchId && d.date === date);
-      if (draft) {
-        setShifts(draft.shifts.map(s => ({ ...s })));
-      } else {
-        setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
+    if (editingReportId) {
+      const report = revenueReports.find(r => r.id === editingReportId);
+      if (report) {
+        setBranchId(report.branchId);
+        setDate(report.date);
+        setShifts(report.shifts.map(s => ({ ...s })));
       }
+    } else if (isAdding) {
+      setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
     }
-  }, [date, branchId, isAdding]); // Removed revenueDrafts from dependencies to avoid overwriting while typing
+  }, [editingReportId, isAdding, revenueReports]);
 
   const handleAddShift = () => {
     setShifts([...shifts, { cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
@@ -54,38 +58,48 @@ export default function Revenue() {
     setShifts(newShifts);
   };
 
-  const handleSaveDraft = () => {
+  const saveReport = (status: 'draft' | 'pending') => {
     if (!branchId) return;
-    saveRevenueDraft({
-      branchId,
-      date,
-      shifts: shifts.map(s => ({ ...s, id: Math.random().toString(36).substring(2, 9) })),
-      createdBy: currentUser!.id,
-      createdAt: new Date().toISOString(),
-      status: 'draft'
-    });
-    // Optional: show toast or feedback
+
+    if (editingReportId) {
+      updateRevenueReport(editingReportId, {
+        branchId,
+        date,
+        shifts: shifts.map(s => ({ ...s, id: s.id || Math.random().toString(36).substring(2, 9) })),
+        status
+      });
+    } else {
+      addRevenueReport({
+        branchId,
+        date,
+        shifts: shifts.map(s => ({ ...s, id: Math.random().toString(36).substring(2, 9) })),
+        createdBy: currentUser!.id,
+        status
+      });
+    }
+    setIsAdding(false);
+    setEditingReportId(null);
+    setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!branchId) return;
+    saveReport('pending');
+  };
 
-    addRevenueReport({
-      branchId,
-      date,
-      shifts: shifts.map(s => ({ ...s, id: Math.random().toString(36).substring(2, 9) })),
-      createdBy: currentUser!.id,
-      status: 'pending'
-    });
-    setIsAdding(false);
-    setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
+  const handleSaveDraft = () => {
+    saveReport('draft');
+  };
+
+  const handleEditReport = (report: any) => {
+    setEditingReportId(report.id);
+    setIsAdding(true);
   };
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
-  const canAdd = userRole?.permissions.includes('add_reports');
-  const canDelete = userRole?.permissions.includes('delete_reports');
+  const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_revenue');
+  const canDelete = userRole?.permissions.includes('delete_reports') || userRole?.permissions.includes('delete_revenue');
 
   const filteredReports = revenueReports.filter(r => {
     const dateMatch = isWithinInterval(parseISO(r.date), {
@@ -122,6 +136,15 @@ export default function Revenue() {
       r.shifts.reduce((sum, s) => sum + s.cash + s.pos + s.delivery, 0).toFixed(2),
     ]);
     exportToPDF(headers, data, `تقرير_الإيرادات_${format(new Date(), 'yyyy-MM-dd')}`, 'تقرير الإيرادات اليومية');
+  };
+
+  const handleDeleteReport = (report: any) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا التقرير؟')) {
+      deleteRevenueReport(report.id);
+      addNotification('تم حذف التقرير', 'success', 5000, () => {
+        restoreRevenueReport(report);
+      });
+    }
   };
 
   const handlePrint = (report: any) => {
@@ -206,7 +229,12 @@ export default function Revenue() {
           </div>
           {canAdd && (
             <button
-              onClick={() => setIsAdding(!isAdding)}
+              onClick={() => {
+                setEditingReportId(null);
+                setIsAdding(!isAdding);
+                setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
+                setDate(getDefaultReportDate());
+              }}
               className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
             >
               <Plus size={20} />
@@ -233,155 +261,151 @@ export default function Revenue() {
         </div>
       </div>
 
-      {isAdding && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">تقرير إيراد جديد</h2>
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                  required
-                />
-              </div>
-              {canViewAll && (
+      <AnimatePresence>
+        {isAdding && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-800"
+          >
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
+              {editingReportId ? 'تعديل تقرير إيراد' : 'تقرير إيراد جديد'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
-                  <select
-                    value={branchId}
-                    onChange={(e) => setBranchId(e.target.value)}
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     required
-                  >
-                    <option value="">اختر الفرع</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  />
                 </div>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-md font-bold text-gray-900 dark:text-white">الورديات</h3>
-                <button type="button" onClick={handleAddShift} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold hover:underline">
-                  + إضافة وردية
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-6">
-                {shifts.map((shift, index) => (
-                  <div key={index} className="bg-gray-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 relative group">
-                    <div className="absolute top-4 left-4">
-                      {shifts.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveShift(index)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center text-sm font-bold">
-                          {index + 1}
-                        </div>
-                        <h4 className="text-sm font-bold text-gray-700 dark:text-slate-300">تفاصيل الوردية</h4>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={handleSaveDraft}
-                        className="flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-3 py-1.5 rounded-lg transition-all"
-                        title="حفظ هذه الوردية كمسودة"
-                      >
-                        <Save size={14} />
-                        <span>حفظ الوردية</span>
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><User size={14}/> اسم الموظف</label>
-                        <input
-                          type="text"
-                          value={shift.employeeName}
-                          onChange={(e) => handleShiftChange(index, 'employeeName', e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                          placeholder="اسم الموظف"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><DollarSign size={14}/> إيراد نقدي</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={shift.cash || ''}
-                          onChange={(e) => handleShiftChange(index, 'cash', e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><CreditCard size={14}/> إيراد الشبكة</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={shift.pos || ''}
-                          onChange={(e) => handleShiftChange(index, 'pos', e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><Truck size={14}/> إيراد التوصيل</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={shift.delivery || ''}
-                          onChange={(e) => handleShiftChange(index, 'delivery', e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
+                {canViewAll && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
+                    <select
+                      value={branchId}
+                      onChange={(e) => setBranchId(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      required
+                      disabled={!!editingReportId}
+                    >
+                      <option value="">اختر الفرع</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-6 border-t border-gray-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                {revenueDrafts.some(d => d.branchId === branchId && d.date === date) && (
-                  <span className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-full animate-pulse">
-                    <FileText size={14} />
-                    يوجد مسودة محفوظة
-                  </span>
                 )}
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
-                  إلغاء
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleSaveDraft}
-                  className="px-6 py-2 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 font-bold rounded-2xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all flex items-center gap-2"
-                >
-                  <Save size={18} />
-                  <span>حفظ كمسودة</span>
-                </button>
-                <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all">
-                  حفظ التقرير النهائي
-                </button>
+
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-md font-bold text-gray-900 dark:text-white">الورديات</h3>
+                  <button type="button" onClick={handleAddShift} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold hover:underline">
+                    + إضافة وردية
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-6">
+                  {shifts.map((shift, index) => (
+                    <div key={index} className="bg-gray-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 relative group">
+                      <div className="absolute top-4 left-4">
+                        {shifts.length > 1 && (
+                          <button type="button" onClick={() => handleRemoveShift(index)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center text-sm font-bold">
+                            {index + 1}
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-700 dark:text-slate-300">تفاصيل الوردية</h4>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><User size={14}/> اسم الموظف</label>
+                          <input
+                            type="text"
+                            value={shift.employeeName}
+                            onChange={(e) => handleShiftChange(index, 'employeeName', e.target.value)}
+                            className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            placeholder="اسم الموظف"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><DollarSign size={14}/> إيراد نقدي</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={shift.cash || ''}
+                            onChange={(e) => handleShiftChange(index, 'cash', e.target.value)}
+                            className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><CreditCard size={14}/> إيراد الشبكة</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={shift.pos || ''}
+                            onChange={(e) => handleShiftChange(index, 'pos', e.target.value)}
+                            className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1"><Truck size={14}/> إيراد التوصيل</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={shift.delivery || ''}
+                            onChange={(e) => handleShiftChange(index, 'delivery', e.target.value)}
+                            className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </form>
-        </div>
-      )}
+
+              <div className="flex justify-between items-center pt-6 border-t border-gray-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  {/* Draft badge removed */}
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                    إلغاء
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleSaveDraft}
+                    className="px-6 py-2 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 font-bold rounded-2xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all flex items-center gap-2"
+                  >
+                    <FileEdit size={18} />
+                    <span>حفظ كمسودة</span>
+                  </button>
+                  <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all">
+                    {editingReportId ? 'تحديث التقرير' : 'حفظ التقرير النهائي'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
@@ -410,7 +434,12 @@ export default function Revenue() {
                 const grandTotal = totalCash + totalPos + totalDelivery;
 
                 return (
-                  <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <motion.tr 
+                    key={report.id} 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono font-bold">#{report.referenceNumber}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{report.date}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{branch?.name}</td>
@@ -429,17 +458,25 @@ export default function Revenue() {
                     <td className="px-6 py-4 text-sm font-bold text-emerald-600 dark:text-emerald-400">{grandTotal.toLocaleString()} ر.س</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={cn(
-                        "px-2 py-1 rounded-full text-xs font-bold",
-                        report.status === 'approved' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                        report.status === 'rejected' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                        "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        "px-3 py-1 rounded-full text-xs font-bold",
+                        report.status === 'draft' ? "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400" :
+                        report.status === 'approved' ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" :
+                        report.status === 'rejected' ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
+                        "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
                       )}>
-                        {report.status === 'approved' ? 'مقبول' : report.status === 'rejected' ? 'مرفوض' : 'معلق'}
+                        {report.status === 'draft' ? 'مسودة' :
+                         report.status === 'approved' ? 'معتمد' :
+                         report.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
                       </span>
                     </td>
                     {canDelete && (
-                      <td className="px-6 py-4 text-sm">
-                        <button onClick={() => deleteRevenueReport(report.id)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                      <td className="px-6 py-4 text-sm flex items-center gap-2">
+                        {report.status === 'draft' && (
+                          <button onClick={() => handleEditReport(report)} className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
+                            <Edit size={18} />
+                          </button>
+                        )}
+                        <button onClick={() => handleDeleteReport(report)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
                           <Trash2 size={18} />
                         </button>
                       </td>
@@ -449,12 +486,12 @@ export default function Revenue() {
                         <Eye size={18} />
                       </button>
                     </td>
-                  </tr>
+                  </motion.tr>
                 );
               })}
               {filteredReports.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
+                  <td colSpan={11} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <Filter size={40} className="text-gray-200 dark:text-slate-800" />
                       <p>لا توجد تقارير إيرادات ضمن الفلاتر المحددة</p>

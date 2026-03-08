@@ -104,38 +104,6 @@ export default function Dashboard() {
     { name: 'تقارير متأخرة', value: complianceStats.late, icon: Clock, color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
   ];
 
-  const scheduledReadingsStatus = useMemo(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const now = format(new Date(), 'HH:mm');
-    
-    const relevantBranches = selectedBranch === 'all' 
-      ? (canViewAll ? branches.map(b => b.id) : [currentUser?.branchId])
-      : [selectedBranch];
-
-    const readings = [];
-
-    for (const branchId of relevantBranches) {
-      if (!branchId) continue;
-      
-      for (const item of scheduledReadingItems) {
-        const record = readingRecords.find(r => r.itemId === item.id && r.branchId === branchId && r.date === today);
-        const isPast = item.scheduledTime < now;
-        
-        readings.push({
-          ...item,
-          branchId,
-          branchName: branches.find(b => b.id === branchId)?.name,
-          recorded: !!record,
-          record,
-          status: record ? 'completed' : (isPast ? 'missed' : 'upcoming'),
-          recordedBy: record ? users.find(u => u.id === record.recordedBy)?.name : null
-        });
-      }
-    }
-
-    return readings.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-  }, [scheduledReadingItems, readingRecords, branches, selectedBranch, canViewAll, currentUser, users]);
-
   return (
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -197,56 +165,6 @@ export default function Dashboard() {
             </div>
           );
         })}
-      </div>
-
-      {/* Scheduled Readings Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 p-6 overflow-hidden">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <Clock size={20} className="text-indigo-600" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">القراءات المجدولة لليوم</h2>
-          </div>
-          <span className="text-xs text-gray-400">{format(new Date(), 'yyyy-MM-dd')}</span>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {scheduledReadingsStatus.map((reading, idx) => (
-            <div key={`${reading.id}-${reading.branchId}`} className={cn(
-              "p-4 rounded-2xl border transition-all",
-              reading.status === 'completed' ? "bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30" :
-              reading.status === 'missed' ? "bg-rose-50/50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30" :
-              "bg-gray-50/50 dark:bg-slate-800/50 border-gray-100 dark:border-slate-800"
-            )}>
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-bold text-gray-400 dark:text-slate-500">{reading.scheduledTime}</span>
-                {reading.status === 'completed' ? <CheckCircle2 size={16} className="text-emerald-500" /> :
-                 reading.status === 'missed' ? <AlertCircle size={16} className="text-rose-500" /> :
-                 <Clock size={16} className="text-gray-400" />}
-              </div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">{reading.name}</h3>
-              <p className="text-[10px] text-gray-500 dark:text-slate-400 mb-2">{reading.branchName}</p>
-              
-              {reading.recorded ? (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-                  <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                    <User size={10} />
-                    <span>{reading.recordedBy}</span>
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-600">{reading.record?.value} {reading.unit}</span>
-                </div>
-              ) : (
-                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-                  <span className={cn(
-                    "text-[10px] font-bold",
-                    reading.status === 'missed' ? "text-rose-500" : "text-gray-400"
-                  )}>
-                    {reading.status === 'missed' ? 'فائتة' : 'قادمة'}
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

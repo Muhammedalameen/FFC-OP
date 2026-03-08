@@ -5,8 +5,41 @@ import { format } from 'date-fns';
 export const AVAILABLE_PERMISSIONS = [
   { id: 'view_all_branches', name: 'الاطلاع على كافة الفروع' },
   { id: 'manage_system', name: 'إدارة النظام (المستخدمين، الفروع، الصلاحيات، الإعدادات)' },
-  { id: 'add_reports', name: 'إضافة التقارير والطلبات' },
-  { id: 'delete_reports', name: 'حذف التقارير' },
+  
+  // Revenue Permissions
+  { id: 'view_revenue', name: 'عرض الإيرادات' },
+  { id: 'add_revenue', name: 'إضافة إيراد' },
+  { id: 'edit_revenue', name: 'تعديل إيراد' },
+  { id: 'delete_revenue', name: 'حذف إيراد' },
+
+  // Inventory Permissions
+  { id: 'view_inventory', name: 'عرض المخزون' },
+  { id: 'add_inventory', name: 'إضافة مخزون' },
+  { id: 'edit_inventory', name: 'تعديل مخزون' },
+  { id: 'delete_inventory', name: 'حذف مخزون' },
+
+  // Scheduled Readings Permissions
+  { id: 'view_scheduled', name: 'عرض القراءات المجدولة' },
+  { id: 'add_scheduled', name: 'إضافة قراءة مجدولة' },
+  { id: 'edit_scheduled', name: 'تعديل قراءة مجدولة' },
+  { id: 'delete_scheduled', name: 'حذف قراءة مجدولة' },
+
+  // Maintenance Permissions
+  { id: 'view_maintenance', name: 'عرض طلبات الصيانة' },
+  { id: 'add_maintenance', name: 'إضافة طلب صيانة' },
+  { id: 'edit_maintenance', name: 'تعديل طلب صيانة' },
+  { id: 'delete_maintenance', name: 'حذف طلب صيانة' },
+  { id: 'approve_maintenance_cost', name: 'اعتماد تكلفة الصيانة' },
+
+  // Purchase Permissions
+  { id: 'view_purchase', name: 'عرض طلبات الشراء' },
+  { id: 'add_purchase', name: 'إضافة طلب شراء' },
+  { id: 'edit_purchase', name: 'تعديل طلب شراء' },
+  { id: 'delete_purchase', name: 'حذف طلب شراء' },
+
+  // Legacy/Other
+  { id: 'add_reports', name: 'إضافة التقارير والطلبات (عام)' },
+  { id: 'delete_reports', name: 'حذف التقارير (عام)' },
   { id: 'manage_tickets', name: 'إدارة التذاكر (تغيير الحالة والحذف)' },
   { id: 'approve_reports', name: 'مراجعة واعتماد التقارير' },
   { id: 'view_maintenance_only', name: 'الاطلاع على طلبات الصيانة فقط' },
@@ -161,6 +194,9 @@ export interface Ticket {
   // Maintenance specific
   equipmentName?: string;
   urgency?: 'low' | 'medium' | 'high';
+  cost?: number;
+  isCostApproved?: boolean;
+  costApprovedBy?: string;
   // Purchase specific
   items?: { name: string; quantity: number; unit: string }[];
   estimatedCost?: number;
@@ -170,6 +206,7 @@ export interface Notification {
   id: string;
   message: string;
   type: 'success' | 'error' | 'info';
+  undoAction?: () => void;
 }
 
 interface AppState {
@@ -184,7 +221,6 @@ interface AppState {
   scheduledReadingItems: ScheduledReadingItem[];
   readingRecords: ReadingRecord[];
   tickets: Ticket[];
-  revenueDrafts: RevenueReport[];
   currentUser: User | null;
   theme: 'light' | 'dark' | 'system';
   notifications: Notification[];
@@ -193,7 +229,7 @@ interface AppState {
   login: (employeeId: string, pin: string) => boolean;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  addNotification: (message: string, type: 'success' | 'error' | 'info', duration?: number, undoAction?: () => void) => void;
   removeNotification: (id: string) => void;
   
   // Admin Actions
@@ -221,17 +257,20 @@ interface AppState {
   // User Actions
   changeUserPin: (id: string, newPin: string) => void;
   addRevenueReport: (report: Omit<RevenueReport, 'id' | 'referenceNumber' | 'createdAt'>) => void;
+  updateRevenueReport: (id: string, updates: Partial<RevenueReport>) => void;
   updateRevenueReportStatus: (id: string, status: 'draft' | 'approved' | 'rejected' | 'pending') => void;
   deleteRevenueReport: (id: string) => void;
-  saveRevenueDraft: (report: Omit<RevenueReport, 'id' | 'referenceNumber'>) => void;
-  deleteRevenueDraft: (branchId: string, date: string) => void;
+  restoreRevenueReport: (report: RevenueReport) => void;
   
   addInventoryReport: (report: Omit<InventoryReport, 'id' | 'referenceNumber' | 'createdAt'>) => void;
+  updateInventoryReport: (id: string, updates: Partial<InventoryReport>) => void;
   updateInventoryReportStatus: (id: string, status: 'draft' | 'approved' | 'rejected' | 'pending') => void;
   deleteInventoryReport: (id: string) => void;
+  restoreInventoryReport: (report: InventoryReport) => void;
   
   addInspectionReport: (report: Omit<InspectionReport, 'id' | 'referenceNumber' | 'createdAt'>) => void;
   deleteInspectionReport: (id: string) => void;
+  restoreInspectionReport: (report: InspectionReport) => void;
 
   addScheduledReadingItem: (item: Omit<ScheduledReadingItem, 'id'>) => void;
   updateScheduledReadingItem: (id: string, item: Partial<ScheduledReadingItem>) => void;
@@ -239,11 +278,14 @@ interface AppState {
 
   addReadingRecord: (record: Omit<ReadingRecord, 'id' | 'referenceNumber' | 'createdAt'>) => void;
   deleteReadingRecord: (id: string) => void;
+  restoreReadingRecord: (record: ReadingRecord) => void;
   
   addTicket: (ticket: Omit<Ticket, 'id' | 'history' | 'referenceNumber'>) => void;
+  updateTicket: (id: string, updates: Partial<Ticket>) => void;
   updateTicketStatus: (id: string, status: Ticket['status']) => void;
   addTicketComment: (ticketId: string, comment: Omit<TicketComment, 'id'>) => void;
   deleteTicket: (id: string) => void;
+  restoreTicket: (ticket: Ticket) => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -255,11 +297,40 @@ const generateReferenceNumber = (dateStr: string, index: number) => {
 };
 
 const initialRoles: CustomRole[] = [
-  { id: 'r1', name: 'مدير نظام', permissions: ['view_all_branches', 'manage_system', 'add_reports', 'delete_reports', 'manage_tickets'] },
-  { id: 'r2', name: 'مدير منطقة', permissions: ['view_all_branches', 'add_reports'] },
-  { id: 'r3', name: 'موظف فرع', permissions: ['add_reports'] },
-  { id: 'r4', name: 'مسؤول صيانة', permissions: ['view_maintenance_only'] },
-  { id: 'r5', name: 'مسؤول مستودع', permissions: ['view_inventory_only', 'view_all_branches'] },
+  { 
+    id: 'r1', 
+    name: 'مدير نظام', 
+    permissions: [
+      'view_all_branches', 'manage_system', 'add_reports', 'delete_reports', 'manage_tickets', 'approve_reports',
+      'view_revenue', 'add_revenue', 'edit_revenue', 'delete_revenue',
+      'view_inventory', 'add_inventory', 'edit_inventory', 'delete_inventory',
+      'view_scheduled', 'add_scheduled', 'edit_scheduled', 'delete_scheduled',
+      'view_maintenance', 'add_maintenance', 'edit_maintenance', 'delete_maintenance', 'approve_maintenance_cost',
+      'view_purchase', 'add_purchase', 'edit_purchase', 'delete_purchase'
+    ] 
+  },
+  { 
+    id: 'r2', 
+    name: 'مدير منطقة', 
+    permissions: [
+      'view_all_branches', 'approve_reports', 'approve_maintenance_cost',
+      'view_revenue', 'view_inventory', 'view_scheduled', 'view_maintenance', 'view_purchase'
+    ] 
+  },
+  { 
+    id: 'r3', 
+    name: 'مدير فرع', 
+    permissions: [
+      'add_reports',
+      'view_revenue', 'add_revenue',
+      'view_inventory', 'add_inventory',
+      'view_scheduled', 'add_scheduled',
+      'view_maintenance', 'add_maintenance',
+      'view_purchase', 'add_purchase'
+    ] 
+  },
+  { id: 'r4', name: 'مسؤول صيانة', permissions: ['view_maintenance_only', 'view_maintenance', 'add_maintenance', 'edit_maintenance'] },
+  { id: 'r5', name: 'مسؤول مستودع', permissions: ['view_inventory_only', 'view_all_branches', 'view_inventory', 'add_inventory'] },
 ];
 
 const initialUsers: User[] = [
@@ -324,7 +395,6 @@ export const useStore = create<AppState>()(
       scheduledReadingItems: initialScheduledReadingItems,
       readingRecords: [],
       tickets: [],
-      revenueDrafts: [],
       currentUser: null,
       theme: 'system',
       notifications: [],
@@ -339,12 +409,12 @@ export const useStore = create<AppState>()(
       },
       logout: () => set({ currentUser: null }),
       setTheme: (theme) => set({ theme }),
-      addNotification: (message, type) => {
+      addNotification: (message, type, duration = 3000, undoAction) => {
         const id = generateId();
-        set((state) => ({ notifications: [...state.notifications, { id, message, type }] }));
+        set((state) => ({ notifications: [...state.notifications, { id, message, type, undoAction }] }));
         setTimeout(() => {
           set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) }));
-        }, 3000);
+        }, duration);
       },
       removeNotification: (id) => set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) })),
 
@@ -460,11 +530,16 @@ export const useStore = create<AppState>()(
               createdAt: new Date().toISOString(),
               referenceNumber,
               status: report.status || 'pending'
-            }],
-            revenueDrafts: state.revenueDrafts.filter(d => !(d.branchId === report.branchId && d.date === report.date))
+            }]
           };
         });
         get().addNotification('تم إضافة تقرير الإيرادات بنجاح', 'success');
+      },
+      updateRevenueReport: (id, updates) => {
+        set((state) => ({
+          revenueReports: state.revenueReports.map(r => r.id === id ? { ...r, ...updates } : r)
+        }));
+        get().addNotification('تم تحديث تقرير الإيرادات', 'success');
       },
       updateRevenueReportStatus: (id, status) => {
         set((state) => ({
@@ -474,24 +549,11 @@ export const useStore = create<AppState>()(
       },
       deleteRevenueReport: (id) => {
         set((state) => ({ revenueReports: state.revenueReports.filter(r => r.id !== id) }));
-        get().addNotification('تم حذف التقرير', 'success');
       },
-      saveRevenueDraft: (report) => {
-        set((state) => {
-          const existingIndex = state.revenueDrafts.findIndex(d => d.branchId === report.branchId && d.date === report.date);
-          const newDrafts = [...state.revenueDrafts];
-          if (existingIndex !== -1) {
-            newDrafts[existingIndex] = { ...report, id: state.revenueDrafts[existingIndex].id, referenceNumber: '', createdAt: '', status: 'draft' };
-          } else {
-            newDrafts.push({ ...report, id: generateId(), referenceNumber: '', createdAt: '', status: 'draft' });
-          }
-          return { revenueDrafts: newDrafts };
-        });
-        get().addNotification('تم حفظ المسودة', 'success');
+      restoreRevenueReport: (report) => {
+        set((state) => ({ revenueReports: [...state.revenueReports, report] }));
+        get().addNotification('تم استعادة التقرير', 'success');
       },
-      deleteRevenueDraft: (branchId, date) => set((state) => ({
-        revenueDrafts: state.revenueDrafts.filter(d => !(d.branchId === branchId && d.date === date))
-      })),
 
       addInventoryReport: (report) => {
         set((state) => {
@@ -509,6 +571,12 @@ export const useStore = create<AppState>()(
         });
         get().addNotification('تم إضافة تقرير الجرد بنجاح', 'success');
       },
+      updateInventoryReport: (id, updates) => {
+        set((state) => ({
+          inventoryReports: state.inventoryReports.map(r => r.id === id ? { ...r, ...updates } : r)
+        }));
+        get().addNotification('تم تحديث تقرير الجرد', 'success');
+      },
       updateInventoryReportStatus: (id, status) => {
         set((state) => ({
           inventoryReports: state.inventoryReports.map(r => r.id === id ? { ...r, status } : r)
@@ -517,7 +585,10 @@ export const useStore = create<AppState>()(
       },
       deleteInventoryReport: (id) => {
         set((state) => ({ inventoryReports: state.inventoryReports.filter(r => r.id !== id) }));
-        get().addNotification('تم حذف التقرير', 'success');
+      },
+      restoreInventoryReport: (report) => {
+        set((state) => ({ inventoryReports: [...state.inventoryReports, report] }));
+        get().addNotification('تم استعادة التقرير', 'success');
       },
 
       addInspectionReport: (report) => {
@@ -537,7 +608,10 @@ export const useStore = create<AppState>()(
       },
       deleteInspectionReport: (id) => {
         set((state) => ({ inspectionReports: state.inspectionReports.filter(r => r.id !== id) }));
-        get().addNotification('تم حذف التقرير', 'success');
+      },
+      restoreInspectionReport: (report) => {
+        set((state) => ({ inspectionReports: [...state.inspectionReports, report] }));
+        get().addNotification('تم استعادة التقرير', 'success');
       },
 
       addScheduledReadingItem: (item) => {
@@ -570,7 +644,10 @@ export const useStore = create<AppState>()(
       },
       deleteReadingRecord: (id) => {
         set((state) => ({ readingRecords: state.readingRecords.filter(r => r.id !== id) }));
-        get().addNotification('تم حذف القراءة', 'success');
+      },
+      restoreReadingRecord: (record) => {
+        set((state) => ({ readingRecords: [...state.readingRecords, record] }));
+        get().addNotification('تم استعادة التقرير', 'success');
       },
 
       addTicket: (ticket) => {
@@ -590,6 +667,12 @@ export const useStore = create<AppState>()(
           };
         });
         get().addNotification('تم إنشاء التذكرة بنجاح', 'success');
+      },
+      updateTicket: (id, updates) => {
+        set((state) => ({
+          tickets: state.tickets.map(t => t.id === id ? { ...t, ...updates } : t)
+        }));
+        get().addNotification('تم تحديث التذكرة', 'success');
       },
       updateTicketStatus: (id, status) => {
         set((state) => ({ 
@@ -634,7 +717,10 @@ export const useStore = create<AppState>()(
       },
       deleteTicket: (id) => {
         set((state) => ({ tickets: state.tickets.filter(t => t.id !== id) }));
-        get().addNotification('تم حذف التذكرة', 'success');
+      },
+      restoreTicket: (ticket) => {
+        set((state) => ({ tickets: [...state.tickets, ticket] }));
+        get().addNotification('تم استعادة الطلب', 'success');
       },
     }),
     {

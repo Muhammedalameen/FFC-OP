@@ -86,9 +86,11 @@ export default function Tickets({ type }: TicketsProps) {
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const permissions = userRole?.permissions || [];
-  const canViewAll = permissions.includes('view_all_branches') || permissions.includes('view_maintenance_only');
-  const canAdd = permissions.includes('add_reports') && !permissions.includes('view_maintenance_only');
-  const canDelete = permissions.includes('delete_reports') && !permissions.includes('view_maintenance_only');
+  
+  const permissionType = type === 'maintenance' ? 'maintenance' : 'purchase';
+  const canViewAll = permissions.includes('view_all_branches') || permissions.includes(`view_${permissionType}_only`) || permissions.includes(`view_${permissionType}`);
+  const canAdd = (permissions.includes('add_reports') || permissions.includes(`add_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
+  const canDelete = (permissions.includes('delete_reports') || permissions.includes(`delete_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
 
   const filteredTickets = tickets.filter(t => {
     if (t.type !== type) return false;

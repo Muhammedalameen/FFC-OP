@@ -4,9 +4,10 @@ import { Plus, Trash2, Save, CheckCircle, XCircle, MinusCircle, Calendar, Buildi
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF } from '../lib/exportUtils';
 import { getDefaultReportDate } from '../lib/dateUtils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Inspection() {
-  const { currentUser, customRoles, branches, operationalItems, inspectionReports, addInspectionReport, deleteInspectionReport } = useStore();
+  const { currentUser, customRoles, branches, operationalItems, inspectionReports, addInspectionReport, deleteInspectionReport, addNotification, restoreInspectionReport } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [date, setDate] = useState(getDefaultReportDate());
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
@@ -86,6 +87,15 @@ export default function Inspection() {
     exportToPDF(headers, data, `تقارير_التشغيل_${format(new Date(), 'yyyy-MM-dd')}`, 'تقارير التشغيل');
   };
 
+  const handleDeleteReport = (report: any) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا التقرير؟')) {
+      deleteInspectionReport(report.id);
+      addNotification('تم حذف التقرير', 'success', 5000, () => {
+        restoreInspectionReport(report);
+      });
+    }
+  };
+
   // Group operational items by category
   const categories = Array.from(new Set(operationalItems.map(i => i.category)));
 
@@ -131,114 +141,121 @@ export default function Inspection() {
         </div>
       </div>
 
-      {isAdding && (
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-800 animate-in fade-in slide-in-from-top-4 duration-300">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">تقرير تشغيل جديد</h2>
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
-                  required
-                />
-              </div>
-              {canViewAll && (
+      <AnimatePresence>
+        {isAdding && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-800"
+          >
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">تقرير تشغيل جديد</h2>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
-                  <select
-                    value={branchId}
-                    onChange={(e) => setBranchId(e.target.value)}
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
                     required
-                  >
-                    <option value="">اختر الفرع</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  />
                 </div>
-              )}
-            </div>
-
-            <div className="space-y-10">
-              {categories.map(category => (
-                <div key={category} className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-1 bg-indigo-600 rounded-full" />
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{category}</h3>
+                {canViewAll && (
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
+                    <select
+                      value={branchId}
+                      onChange={(e) => setBranchId(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
+                      required
+                    >
+                      <option value="">اختر الفرع</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
                   </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    {items.map((item, index) => {
-                      const opItem = operationalItems.find(i => i.id === item.itemId);
-                      if (!opItem || opItem.category !== category) return null;
-                      
-                      return (
-                        <div key={item.itemId} className="flex flex-col lg:flex-row lg:items-center gap-6 p-6 bg-gray-50 dark:bg-slate-800/50 rounded-3xl border border-gray-100 dark:border-slate-800 transition-all hover:shadow-md">
-                          <div className="lg:w-1/3 font-bold text-gray-900 dark:text-white text-lg">{opItem.name}</div>
-                          <div className="flex gap-2 lg:w-1/3">
-                            <button
-                              type="button"
-                              onClick={() => handleItemChange(index, 'status', 'pass')}
-                              className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${
-                                item.status === 'pass' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
-                              }`}
-                            >
-                              <CheckCircle size={18} /> مطابق
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleItemChange(index, 'status', 'fail')}
-                              className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${
-                                item.status === 'fail' ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
-                              }`}
-                            >
-                              <XCircle size={18} /> غير مطابق
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleItemChange(index, 'status', 'na')}
-                              className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${
-                                item.status === 'na' ? 'bg-slate-600 text-white shadow-lg shadow-slate-500/20' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
-                              }`}
-                            >
-                              <MinusCircle size={18} /> N/A
-                            </button>
-                          </div>
-                          <div className="lg:w-1/3">
-                            <input
-                              type="text"
-                              value={item.notes}
-                              onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
-                              placeholder="ملاحظات (اختياري)"
-                              className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              {items.length === 0 && (
-                <div className="text-center py-12 bg-gray-50 dark:bg-slate-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-800">
-                  <p className="text-gray-500 dark:text-slate-400">لا توجد بنود تشغيل مسجلة</p>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="flex justify-end gap-4 pt-8 border-t border-gray-100 dark:border-slate-800">
-              <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl font-bold transition-colors">
-                إلغاء
-              </button>
-              <button type="submit" disabled={items.length === 0} className="px-10 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold shadow-lg shadow-indigo-500/20 transition-all">
-                <Save size={20} /> حفظ التقرير
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              <div className="space-y-10">
+                {categories.map(category => (
+                  <div key={category} className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-1 bg-indigo-600 rounded-full" />
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{category}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      {items.map((item, index) => {
+                        const opItem = operationalItems.find(i => i.id === item.itemId);
+                        if (!opItem || opItem.category !== category) return null;
+                        
+                        return (
+                          <div key={item.itemId} className="flex flex-col lg:flex-row lg:items-center gap-6 p-6 bg-gray-50 dark:bg-slate-800/50 rounded-3xl border border-gray-100 dark:border-slate-800 transition-all hover:shadow-md">
+                            <div className="lg:w-1/3 font-bold text-gray-900 dark:text-white text-lg">{opItem.name}</div>
+                            <div className="flex gap-2 lg:w-1/3">
+                              <button
+                                type="button"
+                                onClick={() => handleItemChange(index, 'status', 'pass')}
+                                className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${
+                                  item.status === 'pass' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                }`}
+                              >
+                                <CheckCircle size={18} /> مطابق
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleItemChange(index, 'status', 'fail')}
+                                className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${
+                                  item.status === 'fail' ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                }`}
+                              >
+                                <XCircle size={18} /> غير مطابق
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleItemChange(index, 'status', 'na')}
+                                className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${
+                                  item.status === 'na' ? 'bg-slate-600 text-white shadow-lg shadow-slate-500/20' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                }`}
+                              >
+                                <MinusCircle size={18} /> N/A
+                              </button>
+                            </div>
+                            <div className="lg:w-1/3">
+                              <input
+                                type="text"
+                                value={item.notes}
+                                onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
+                                placeholder="ملاحظات (اختياري)"
+                                className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {items.length === 0 && (
+                  <div className="text-center py-12 bg-gray-50 dark:bg-slate-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-800">
+                    <p className="text-gray-500 dark:text-slate-400">لا توجد بنود تشغيل مسجلة</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-4 pt-8 border-t border-gray-100 dark:border-slate-800">
+                <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl font-bold transition-colors">
+                  إلغاء
+                </button>
+                <button type="submit" disabled={items.length === 0} className="px-10 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold shadow-lg shadow-indigo-500/20 transition-all">
+                  <Save size={20} /> حفظ التقرير
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
@@ -260,7 +277,12 @@ export default function Inspection() {
                 const failCount = report.items.filter(i => i.status === 'fail').length;
                 const naCount = report.items.filter(i => i.status === 'na').length;
                 return (
-                  <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <motion.tr 
+                    key={report.id} 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{report.date}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{branch?.name}</td>
                     <td className="px-6 py-4 text-center">
@@ -280,12 +302,12 @@ export default function Inspection() {
                     </td>
                     {canDelete && (
                       <td className="px-6 py-4 text-sm">
-                        <button onClick={() => deleteInspectionReport(report.id)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-xl transition-colors">
+                        <button onClick={() => handleDeleteReport(report)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-xl transition-colors">
                           <Trash2 size={18} />
                         </button>
                       </td>
                     )}
-                  </tr>
+                  </motion.tr>
                 );
               })}
               {filteredReports.length === 0 && (

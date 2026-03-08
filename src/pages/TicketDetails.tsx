@@ -30,11 +30,15 @@ export default function TicketDetails() {
     users, 
     tickets, 
     updateTicketStatus, 
+    updateTicket,
     addTicketComment, 
-    deleteTicket 
+    deleteTicket,
+    addNotification,
+    restoreTicket
   } = useStore();
   
   const [commentText, setCommentText] = useState('');
+  const [costInput, setCostInput] = useState('');
   
   const ticket = tickets.find(t => t.id === id);
   
@@ -53,8 +57,9 @@ export default function TicketDetails() {
   const branch = branches.find(b => b.id === ticket.branchId);
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
-  const canDelete = userRole?.permissions.includes('delete_reports');
-  const canManage = userRole?.permissions.includes('manage_tickets');
+  const canDelete = userRole?.permissions.includes('delete_reports') || userRole?.permissions.includes('delete_maintenance');
+  const canManage = userRole?.permissions.includes('manage_tickets') || userRole?.permissions.includes('edit_maintenance');
+  const canApproveCost = userRole?.permissions.includes('approve_maintenance_cost') || userRole?.id === 'r2';
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +72,16 @@ export default function TicketDetails() {
     });
     
     setCommentText('');
+  };
+
+  const handleUpdateCost = () => {
+    if (!costInput) return;
+    updateTicket(ticket.id, { cost: parseFloat(costInput), isCostApproved: false });
+    setCostInput('');
+  };
+
+  const handleApproveCost = () => {
+    updateTicket(ticket.id, { isCostApproved: true, costApprovedBy: currentUser!.id });
   };
 
   const statusMap = {
@@ -112,6 +127,9 @@ export default function TicketDetails() {
               onClick={() => {
                 if (confirm('هل أنت متأكد من حذف هذا الطلب؟')) {
                   deleteTicket(ticket.id);
+                  addNotification('تم حذف الطلب', 'success', 5000, () => {
+                    restoreTicket(ticket);
+                  });
                   navigate(-1);
                 }
               }} 
@@ -188,6 +206,59 @@ export default function TicketDetails() {
                     {ticket.urgency ? urgencyMap[ticket.urgency].label : 'غير محدد'}
                   </span>
                 </div>
+              </div>
+
+              {/* Cost Estimation Section */}
+              <div className="mt-8 border-t border-gray-100 dark:border-slate-800 pt-6">
+                <h4 className="text-md font-bold text-gray-900 dark:text-white mb-4">تكلفة الإصلاح</h4>
+                
+                {ticket.cost ? (
+                  <div className="flex items-center justify-between bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl">
+                    <div>
+                      <span className="text-xs text-gray-500 block">التكلفة المقدرة</span>
+                      <span className="text-xl font-bold text-indigo-600">{ticket.cost.toLocaleString()} ر.س</span>
+                    </div>
+                    
+                    {ticket.isCostApproved ? (
+                      <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-lg">
+                        <CheckCircle2 size={18} />
+                        <span className="text-sm font-bold">تم الاعتماد</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <span className="text-amber-500 text-sm font-bold flex items-center gap-1">
+                          <AlertCircle size={16} />
+                          بانتظار الاعتماد
+                        </span>
+                        {canApproveCost && (
+                          <button 
+                            onClick={handleApproveCost}
+                            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
+                          >
+                            اعتماد التكلفة
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="number" 
+                      placeholder="أدخل التكلفة التقديرية" 
+                      value={costInput}
+                      onChange={(e) => setCostInput(e.target.value)}
+                      className="flex-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2"
+                    />
+                    <button 
+                      onClick={handleUpdateCost}
+                      disabled={!costInput}
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      حفظ التكلفة
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

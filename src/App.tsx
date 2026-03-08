@@ -24,7 +24,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 import RevenueReports from './pages/RevenueReports';
-import ReviewReports from './pages/ReviewReports';
 
 export default function App() {
   const { theme } = useStore();
@@ -58,7 +57,6 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="revenue" element={<Revenue />} />
           <Route path="revenue-reports" element={<RevenueReports />} />
-          <Route path="review-reports" element={<ReviewReports />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="need-report" element={<NeedReport />} />
           <Route path="inspection" element={<Inspection />} />

@@ -17,6 +17,7 @@ import {
 import { format, parse, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '../lib/utils';
+import { motion } from 'framer-motion';
 
 import { compressImage } from '../lib/imageUtils';
 
@@ -26,12 +27,16 @@ export default function ScheduledReadings() {
     readingRecords, 
     addReadingRecord, 
     currentUser,
-    branches 
+    branches,
+    customRoles
   } = useStore();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedBranchId, setSelectedBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
   const [tempImages, setTempImages] = useState<Record<string, string>>({});
+
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_scheduled');
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -159,13 +164,16 @@ export default function ScheduledReadings() {
                   {category}
                 </h3>
                 <div className="grid grid-cols-1 gap-3">
-                  {itemsInCategory.map(item => {
+                  {itemsInCategory.map((item, index) => {
                     const record = recordsForDay.find(r => r.itemId === item.id);
                     const isCompleted = !!record;
                     
                     return (
-                      <div 
+                      <motion.div 
                         key={item.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
                         className={cn(
                           "bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border transition-all",
                           isCompleted 
@@ -222,14 +230,18 @@ export default function ScheduledReadings() {
                                     onChange={(e) => handleImageUpload(item.id, e)}
                                     className="absolute inset-0 opacity-0 cursor-pointer w-10 h-10"
                                     id={`img-${item.id}`}
+                                    disabled={!canAdd}
                                   />
                                   <button 
                                     className={cn(
                                       "p-2 rounded-lg border transition-all",
                                       tempImages[item.id] 
                                         ? "bg-indigo-50 border-indigo-200 text-indigo-600" 
-                                        : "bg-gray-50 border-gray-200 text-gray-400 hover:text-indigo-600 hover:border-indigo-200"
+                                        : !canAdd 
+                                          ? "bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed"
+                                          : "bg-gray-50 border-gray-200 text-gray-400 hover:text-indigo-600 hover:border-indigo-200"
                                     )}
+                                    disabled={!canAdd}
                                   >
                                     {tempImages[item.id] ? (
                                       <div className="relative">
@@ -260,7 +272,7 @@ export default function ScheduledReadings() {
                                   placeholder={tempImages[item.id] ? "القيمة" : "صورة أولاً"}
                                   className="w-24 p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 text-center disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-800"
                                   defaultValue={record?.value as number}
-                                  disabled={isCompleted || !tempImages[item.id]}
+                                  disabled={isCompleted || !tempImages[item.id] || !canAdd}
                                   onBlur={(e) => {
                                     if (!isCompleted && e.target.value !== '') {
                                       handleSaveReading(item.id, parseFloat(e.target.value));
@@ -272,12 +284,12 @@ export default function ScheduledReadings() {
                             ) : (
                               <button
                                 onClick={() => !isCompleted && handleSaveReading(item.id, true)}
-                                disabled={isCompleted || !tempImages[item.id]}
+                                disabled={isCompleted || !tempImages[item.id] || !canAdd}
                                 className={cn(
                                   "px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2",
                                   isCompleted
                                     ? "bg-green-100 text-green-700 cursor-default"
-                                    : !tempImages[item.id]
+                                    : (!tempImages[item.id] || !canAdd)
                                       ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                                       : "bg-blue-600 text-white hover:bg-blue-700"
                                 )}
@@ -297,7 +309,7 @@ export default function ScheduledReadings() {
                             )}
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </div>

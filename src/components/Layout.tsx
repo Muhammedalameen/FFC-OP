@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, subDays, parseISO } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Layout() {
   const { currentUser, customRoles, logout, theme, setTheme, changeUserPin, revenueReports, inventoryReports, notifications, removeNotification } = useStore();
@@ -34,43 +35,11 @@ export default function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [missingReports, setMissingReports] = useState<{ type: 'revenue' | 'inventory', date: string }[]>([]);
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    // Check for missing reports for the last 3 days (excluding today)
-    const checkMissingReports = () => {
-      const missing = [];
-      const today = new Date();
-      
-      // Check yesterday
-      const yesterday = subDays(today, 1);
-      const dateStr = format(yesterday, 'yyyy-MM-dd');
-      
-      // Check Revenue
-      const hasRevenue = revenueReports.some(r => r.date === dateStr && r.branchId === currentUser.branchId);
-      if (!hasRevenue && !currentUser.roleId.includes('r4') && !currentUser.roleId.includes('r5')) {
-         if (currentUser.roleId === 'r1' || currentUser.roleId === 'r2' || (currentUser.roleId === 'r3' && currentUser.branchId)) {
-             missing.push({ type: 'revenue', date: dateStr });
-         }
-      }
-
-      // Check Inventory
-      const hasInventory = inventoryReports.some(r => r.date === dateStr && r.branchId === currentUser.branchId);
-      if (!hasInventory && (currentUser.roleId === 'r1' || currentUser.roleId === 'r2' || (currentUser.roleId === 'r3' && currentUser.branchId))) {
-          missing.push({ type: 'inventory', date: dateStr });
-      }
-
-      setMissingReports(missing as any);
-    };
-
-    checkMissingReports();
-  }, [currentUser, revenueReports, inventoryReports]);
 
   if (!currentUser) {
     return <Outlet />;
@@ -106,7 +75,6 @@ export default function Layout() {
     { name: 'الإيرادات اليومية', path: '/revenue', icon: DollarSign, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
     { name: 'جرد المخزون', path: '/inventory', icon: Package, show: !permissions.includes('view_maintenance_only') },
     { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'مراجعة التقارير', path: '/review-reports', icon: CheckCircle2, show: permissions.includes('approve_reports') || permissions.includes('manage_system') },
     { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
     { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: !permissions.includes('view_maintenance_only') },
     { name: 'تقرير الاحتياج', path: '/need-report', icon: AlertCircle, show: !permissions.includes('view_maintenance_only') },
@@ -121,30 +89,46 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col md:flex-row transition-colors duration-300" dir="rtl">
       {/* Notifications Toast */}
-      <div className="fixed top-4 left-4 z-50 flex flex-col gap-2 pointer-events-none">
-        {notifications.map(notification => (
-          <div 
-            key={notification.id}
-            className={cn(
-              "pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border animate-in slide-in-from-left-full duration-300",
-              notification.type === 'success' ? "bg-white dark:bg-slate-900 border-emerald-500 text-emerald-600 dark:text-emerald-400" :
-              notification.type === 'error' ? "bg-white dark:bg-slate-900 border-red-500 text-red-600 dark:text-red-400" :
-              "bg-white dark:bg-slate-900 border-blue-500 text-blue-600 dark:text-blue-400"
-            )}
-          >
-            {notification.type === 'success' ? <CheckCircle2 size={20} /> :
-             notification.type === 'error' ? <AlertCircle size={20} /> :
-             <Info size={20} />}
-            <span className="font-bold text-sm">{notification.message}</span>
-            <button onClick={() => removeNotification(notification.id)} className="mr-2 text-gray-400 hover:text-gray-600">
-              <X size={16} />
-            </button>
-          </div>
-        ))}
+      <div className="fixed top-4 left-4 z-[100] flex flex-col gap-2 pointer-events-none">
+        <AnimatePresence>
+          {notifications.map(notification => (
+            <motion.div 
+              key={notification.id}
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              className={cn(
+                "pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border",
+                notification.type === 'success' ? "bg-white dark:bg-slate-900 border-emerald-500 text-emerald-600 dark:text-emerald-400" :
+                notification.type === 'error' ? "bg-white dark:bg-slate-900 border-red-500 text-red-600 dark:text-red-400" :
+                "bg-white dark:bg-slate-900 border-blue-500 text-blue-600 dark:text-blue-400"
+              )}
+            >
+              {notification.type === 'success' ? <CheckCircle2 size={20} /> :
+               notification.type === 'error' ? <AlertCircle size={20} /> :
+               <Info size={20} />}
+              <span className="font-bold text-sm">{notification.message}</span>
+              {notification.undoAction && (
+                <button 
+                  onClick={() => {
+                    notification.undoAction?.();
+                    removeNotification(notification.id);
+                  }}
+                  className="mr-2 px-3 py-1 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg text-xs font-bold transition-colors"
+                >
+                  تراجع
+                </button>
+              )}
+              <button onClick={() => removeNotification(notification.id)} className="mr-2 text-gray-400 hover:text-gray-600">
+                <X size={16} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Mobile Header */}
-      <div className="md:hidden bg-white dark:bg-slate-900 shadow-sm p-4 flex justify-between items-center border-b border-gray-100 dark:border-slate-800">
+      <div className="md:hidden sticky top-0 z-50 bg-white dark:bg-slate-900 shadow-sm p-4 flex justify-between items-center border-b border-gray-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <img 
             src="https://i.ibb.co/8L8Wx06M/Logo-Saree-1.png" 
@@ -155,7 +139,7 @@ export default function Layout() {
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">نظام المتابعة</h1>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-gray-600 dark:text-slate-400">
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-gray-600 dark:text-slate-400 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -163,10 +147,31 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "bg-white dark:bg-slate-900 shadow-lg flex-shrink-0 md:flex flex-col transition-all duration-300 z-20 border-l border-gray-100 dark:border-slate-800",
-        isMobileMenuOpen ? "fixed inset-0 w-full" : "hidden md:flex",
+        "bg-white dark:bg-slate-900 shadow-lg flex-shrink-0 md:flex flex-col transition-all duration-300 z-50 border-l border-gray-100 dark:border-slate-800",
+        isMobileMenuOpen ? "fixed inset-0 w-full h-full animate-in slide-in-from-right-10 fade-in duration-200" : "hidden md:flex",
         isSidebarCollapsed ? "md:w-20" : "md:w-72"
       )}>
+        {/* Mobile Menu Header */}
+        <div className="md:hidden p-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden p-1">
+                <img 
+                  src="https://i.ibb.co/8L8Wx06M/Logo-Saree-1.png" 
+                  alt="Logo" 
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">القائمة</h1>
+           </div>
+           <button 
+             onClick={() => setIsMobileMenuOpen(false)}
+             className="p-2 bg-gray-50 dark:bg-slate-800 rounded-xl text-gray-500 hover:text-red-500 transition-colors"
+           >
+             <X size={24} />
+           </button>
+        </div>
+
         <div className="p-4 hidden md:flex items-center justify-between">
            {!isSidebarCollapsed && (
              <div className="flex items-center gap-2 animate-in fade-in duration-300">
@@ -192,7 +197,7 @@ export default function Layout() {
            </button>
         </div>
 
-        <div className={cn("px-4 mb-4 hidden md:block", isSidebarCollapsed && "px-2")}>
+        <div className={cn("px-4 mb-4 mt-4 md:mt-0", isSidebarCollapsed && "px-2")}>
            {!isSidebarCollapsed ? (
              <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 animate-in fade-in">
                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">مرحباً، {currentUser.name}</p>
@@ -290,23 +295,83 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto relative">
-        {/* Alerts Banner */}
-        {missingReports.length > 0 && (
-          <div className="mb-6 space-y-2">
-            {missingReports.map((report, idx) => (
-              <div key={idx} className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl flex items-center gap-3 text-red-800 dark:text-red-200 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle size={20} className="flex-shrink-0" />
-                <span className="font-bold">
-                  تنبيه: لم يتم تسجيل {report.type === 'revenue' ? 'إيراد' : 'جرد مخزون'} ليوم أمس ({report.date})
-                </span>
-              </div>
-            ))}
+      <main className="flex-1 overflow-y-auto relative flex flex-col">
+        {/* Desktop Header */}
+        <header className="hidden md:flex items-center justify-between px-10 py-6 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 sticky top-0 z-40">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {navItems.find(item => item.path === location.pathname)?.name || 'نظام المتابعة'}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              {format(new Date(), 'EEEE, d MMMM yyyy')}
+            </p>
           </div>
-        )}
 
+          <div className="flex items-center gap-4">
+            <button className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors relative">
+              <Bell size={20} />
+              {notifications.length > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+              )}
+            </button>
+            
+            <div className="h-8 w-px bg-gray-100 dark:bg-slate-800" />
+
+            <div className="relative">
+              <button 
+                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors"
+              >
+                <div className="text-left hidden lg:block">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
+                </div>
+                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold border-2 border-white dark:border-slate-900 shadow-sm">
+                  {currentUser.name.charAt(0)}
+                </div>
+              </button>
+              
+              {isUserDropdownOpen && (
+                <div className="absolute left-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-2 animate-in zoom-in-95 duration-200 z-50">
+                  <div className="p-2 border-b border-gray-100 dark:border-slate-800 mb-2 lg:hidden">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
+                  </div>
+                  <button
+                    onClick={() => { setIsChangePasswordOpen(true); setIsUserDropdownOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
+                  >
+                    <KeyRound size={18} />
+                    تغيير كلمة المرور
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors font-medium"
+                  >
+                    <LogOut size={18} />
+                    تسجيل الخروج
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <div className="p-4 md:p-10 flex-1">
+        
         <div className="max-w-7xl mx-auto">
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
+        </div>
         </div>
       </main>
 
