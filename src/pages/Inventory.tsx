@@ -93,6 +93,7 @@ export default function Inventory() {
       date,
       items,
       createdBy: currentUser!.id,
+      status: 'pending'
     });
     setIsAdding(false);
   };
@@ -351,9 +352,11 @@ export default function Inventory() {
           <table className="w-full text-right">
             <thead className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
               <tr>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الرقم المرجعي</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">التاريخ</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الفرع</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">عدد الأصناف</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الحالة</th>
                 {canDelete && <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">إجراء</th>}
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">عرض</th>
               </tr>
@@ -363,9 +366,20 @@ export default function Inventory() {
                 const branch = branches.find(b => b.id === report.branchId);
                 return (
                   <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono font-bold">#{report.referenceNumber}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{report.date}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{branch?.name}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{report.items.length}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={cn(
+                        "px-2 py-1 rounded-full text-xs font-bold",
+                        report.status === 'approved' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                        report.status === 'rejected' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                        "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      )}>
+                        {report.status === 'approved' ? 'مقبول' : report.status === 'rejected' ? 'مرفوض' : 'معلق'}
+                      </span>
+                    </td>
                     {canDelete && (
                       <td className="px-6 py-4 text-sm">
                         <button onClick={() => deleteInventoryReport(report.id)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
@@ -407,7 +421,7 @@ export default function Inventory() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">تفاصيل تقرير الجرد</h2>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">{branches.find(b => b.id === selectedReport.branchId)?.name} - {selectedReport.date}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">#{selectedReport.referenceNumber} - {branches.find(b => b.id === selectedReport.branchId)?.name} - {selectedReport.date}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

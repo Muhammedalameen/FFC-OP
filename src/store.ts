@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { format } from 'date-fns';
 
 export const AVAILABLE_PERMISSIONS = [
   { id: 'view_all_branches', name: 'الاطلاع على كافة الفروع' },
@@ -7,6 +8,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'add_reports', name: 'إضافة التقارير والطلبات' },
   { id: 'delete_reports', name: 'حذف التقارير' },
   { id: 'manage_tickets', name: 'إدارة التذاكر (تغيير الحالة والحذف)' },
+  { id: 'approve_reports', name: 'مراجعة واعتماد التقارير' },
   { id: 'view_maintenance_only', name: 'الاطلاع على طلبات الصيانة فقط' },
   { id: 'view_inventory_only', name: 'الاطلاع على تقارير المخزون والاحتياج فقط' },
 ];
@@ -55,12 +57,14 @@ export interface ShiftRevenue {
 
 export interface RevenueReport {
   id: string;
+  referenceNumber: string;
   branchId: string;
   date: string;
   shifts: ShiftRevenue[];
   createdBy: string;
   createdAt: string;
   images?: string[];
+  status: 'draft' | 'approved' | 'rejected' | 'pending';
 }
 
 export interface InventoryReportItem {
@@ -75,12 +79,14 @@ export interface InventoryReportItem {
 
 export interface InventoryReport {
   id: string;
+  referenceNumber: string;
   branchId: string;
   date: string;
   items: InventoryReportItem[];
   createdBy: string;
   createdAt: string;
   images?: string[];
+  status: 'draft' | 'approved' | 'rejected' | 'pending';
 }
 
 export interface InspectionReportItem {
@@ -91,6 +97,7 @@ export interface InspectionReportItem {
 
 export interface InspectionReport {
   id: string;
+  referenceNumber: string;
   branchId: string;
   date: string;
   items: InspectionReportItem[];
@@ -110,6 +117,7 @@ export interface ScheduledReadingItem {
 
 export interface ReadingRecord {
   id: string;
+  referenceNumber: string;
   branchId: string;
   itemId: string;
   value: string | number | boolean;
@@ -139,6 +147,7 @@ export interface TicketHistory {
 
 export interface Ticket {
   id: string;
+  referenceNumber: string;
   branchId: string;
   date: string;
   title: string;
@@ -157,6 +166,12 @@ export interface Ticket {
   estimatedCost?: number;
 }
 
+export interface Notification {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 interface AppState {
   users: User[];
   customRoles: CustomRole[];
@@ -172,11 +187,14 @@ interface AppState {
   revenueDrafts: RevenueReport[];
   currentUser: User | null;
   theme: 'light' | 'dark' | 'system';
+  notifications: Notification[];
   
   // Actions
   login: (employeeId: string, pin: string) => boolean;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  removeNotification: (id: string) => void;
   
   // Admin Actions
   addUser: (user: Omit<User, 'id'>) => void;
@@ -201,31 +219,40 @@ interface AppState {
   deleteOperationalItem: (id: string) => void;
   
   // User Actions
-  addRevenueReport: (report: Omit<RevenueReport, 'id'>) => void;
+  changeUserPin: (id: string, newPin: string) => void;
+  addRevenueReport: (report: Omit<RevenueReport, 'id' | 'referenceNumber' | 'createdAt'>) => void;
+  updateRevenueReportStatus: (id: string, status: 'draft' | 'approved' | 'rejected' | 'pending') => void;
   deleteRevenueReport: (id: string) => void;
-  saveRevenueDraft: (report: Omit<RevenueReport, 'id'>) => void;
+  saveRevenueDraft: (report: Omit<RevenueReport, 'id' | 'referenceNumber'>) => void;
   deleteRevenueDraft: (branchId: string, date: string) => void;
   
-  addInventoryReport: (report: Omit<InventoryReport, 'id'>) => void;
+  addInventoryReport: (report: Omit<InventoryReport, 'id' | 'referenceNumber' | 'createdAt'>) => void;
+  updateInventoryReportStatus: (id: string, status: 'draft' | 'approved' | 'rejected' | 'pending') => void;
   deleteInventoryReport: (id: string) => void;
   
-  addInspectionReport: (report: Omit<InspectionReport, 'id'>) => void;
+  addInspectionReport: (report: Omit<InspectionReport, 'id' | 'referenceNumber' | 'createdAt'>) => void;
   deleteInspectionReport: (id: string) => void;
 
   addScheduledReadingItem: (item: Omit<ScheduledReadingItem, 'id'>) => void;
   updateScheduledReadingItem: (id: string, item: Partial<ScheduledReadingItem>) => void;
   deleteScheduledReadingItem: (id: string) => void;
 
-  addReadingRecord: (record: Omit<ReadingRecord, 'id'>) => void;
+  addReadingRecord: (record: Omit<ReadingRecord, 'id' | 'referenceNumber' | 'createdAt'>) => void;
   deleteReadingRecord: (id: string) => void;
   
-  addTicket: (ticket: Omit<Ticket, 'id' | 'history'>) => void;
+  addTicket: (ticket: Omit<Ticket, 'id' | 'history' | 'referenceNumber'>) => void;
   updateTicketStatus: (id: string, status: Ticket['status']) => void;
   addTicketComment: (ticketId: string, comment: Omit<TicketComment, 'id'>) => void;
   deleteTicket: (id: string) => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
+const generateReferenceNumber = (dateStr: string, index: number) => {
+  const datePart = dateStr.replace(/-/g, '');
+  const sequencePart = (index + 1).toString().padStart(4, '0');
+  return `${datePart}${sequencePart}`;
+};
 
 const initialRoles: CustomRole[] = [
   { id: 'r1', name: 'مدير نظام', permissions: ['view_all_branches', 'manage_system', 'add_reports', 'delete_reports', 'manage_tickets'] },
@@ -300,6 +327,7 @@ export const useStore = create<AppState>()(
       revenueDrafts: [],
       currentUser: null,
       theme: 'system',
+      notifications: [],
 
       login: (employeeId, pin) => {
         const user = get().users.find(u => u.employeeId === employeeId && u.pin === pin);
@@ -311,132 +339,303 @@ export const useStore = create<AppState>()(
       },
       logout: () => set({ currentUser: null }),
       setTheme: (theme) => set({ theme }),
+      addNotification: (message, type) => {
+        const id = generateId();
+        set((state) => ({ notifications: [...state.notifications, { id, message, type }] }));
+        setTimeout(() => {
+          set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) }));
+        }, 3000);
+      },
+      removeNotification: (id) => set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) })),
 
-      addUser: (user) => set((state) => ({ users: [...state.users, { ...user, id: generateId() }] })),
-      updateUser: (id, user) => set((state) => ({ users: state.users.map(u => u.id === id ? { ...u, ...user } : u) })),
-      deleteUser: (id) => set((state) => ({ users: state.users.filter(u => u.id !== id) })),
+      addUser: (user) => {
+        set((state) => ({ users: [...state.users, { ...user, id: generateId() }] }));
+        get().addNotification('تم إضافة المستخدم بنجاح', 'success');
+      },
+      updateUser: (id, user) => {
+        set((state) => ({ users: state.users.map(u => u.id === id ? { ...u, ...user } : u) }));
+        get().addNotification('تم تحديث بيانات المستخدم', 'success');
+      },
+      deleteUser: (id) => {
+        set((state) => ({ users: state.users.filter(u => u.id !== id) }));
+        get().addNotification('تم حذف المستخدم', 'success');
+      },
 
-      addCustomRole: (role) => set((state) => ({ customRoles: [...state.customRoles, { ...role, id: generateId() }] })),
-      updateCustomRole: (id, role) => set((state) => ({ customRoles: state.customRoles.map(r => r.id === id ? { ...r, ...role } : r) })),
-      deleteCustomRole: (id) => set((state) => ({ customRoles: state.customRoles.filter(r => r.id !== id) })),
+      addCustomRole: (role) => {
+        set((state) => ({ customRoles: [...state.customRoles, { ...role, id: generateId() }] }));
+        get().addNotification('تم إضافة الدور بنجاح', 'success');
+      },
+      updateCustomRole: (id, role) => {
+        set((state) => ({ customRoles: state.customRoles.map(r => r.id === id ? { ...r, ...role } : r) }));
+        get().addNotification('تم تحديث الدور', 'success');
+      },
+      deleteCustomRole: (id) => {
+        set((state) => ({ customRoles: state.customRoles.filter(r => r.id !== id) }));
+        get().addNotification('تم حذف الدور', 'success');
+      },
 
-      addBranch: (branch) => set((state) => ({ branches: [...state.branches, { ...branch, id: generateId() }] })),
-      updateBranch: (id, branch) => set((state) => ({ branches: state.branches.map(b => b.id === id ? { ...b, ...branch } : b) })),
-      deleteBranch: (id) => set((state) => ({ branches: state.branches.filter(b => b.id !== id) })),
+      addBranch: (branch) => {
+        set((state) => ({ branches: [...state.branches, { ...branch, id: generateId() }] }));
+        get().addNotification('تم إضافة الفرع بنجاح', 'success');
+      },
+      updateBranch: (id, branch) => {
+        set((state) => ({ branches: state.branches.map(b => b.id === id ? { ...b, ...branch } : b) }));
+        get().addNotification('تم تحديث بيانات الفرع', 'success');
+      },
+      deleteBranch: (id) => {
+        set((state) => ({ branches: state.branches.filter(b => b.id !== id) }));
+        get().addNotification('تم حذف الفرع', 'success');
+      },
 
-      addInventoryItem: (item) => set((state) => ({ inventoryItems: [...state.inventoryItems, { ...item, id: generateId() }] })),
-      updateInventoryItem: (id, item) => set((state) => ({ inventoryItems: state.inventoryItems.map(i => i.id === id ? { ...i, ...item } : i) })),
-      deleteInventoryItem: (id) => set((state) => ({ inventoryItems: state.inventoryItems.filter(i => i.id !== id) })),
-      copyInventoryItems: (fromBranchId, toBranchId) => set((state) => {
-        const fromItems = state.inventoryItems.filter(item => item.branchIds.includes(fromBranchId));
-        const newItems = [...state.inventoryItems];
-        
-        fromItems.forEach(item => {
-          const existingItemIndex = newItems.findIndex(ni => ni.name === item.name && ni.unit === item.unit);
-          if (existingItemIndex !== -1) {
-            const existingItem = newItems[existingItemIndex];
-            if (!existingItem.branchIds.includes(toBranchId)) {
-              newItems[existingItemIndex] = {
-                ...existingItem,
-                branchIds: [...existingItem.branchIds, toBranchId]
-              };
+      addInventoryItem: (item) => {
+        set((state) => ({ inventoryItems: [...state.inventoryItems, { ...item, id: generateId() }] }));
+        get().addNotification('تم إضافة الصنف بنجاح', 'success');
+      },
+      updateInventoryItem: (id, item) => {
+        set((state) => ({ inventoryItems: state.inventoryItems.map(i => i.id === id ? { ...i, ...item } : i) }));
+        get().addNotification('تم تحديث الصنف', 'success');
+      },
+      deleteInventoryItem: (id) => {
+        set((state) => ({ inventoryItems: state.inventoryItems.filter(i => i.id !== id) }));
+        get().addNotification('تم حذف الصنف', 'success');
+      },
+      copyInventoryItems: (fromBranchId, toBranchId) => {
+        set((state) => {
+          const fromItems = state.inventoryItems.filter(item => item.branchIds.includes(fromBranchId));
+          const newItems = [...state.inventoryItems];
+          
+          fromItems.forEach(item => {
+            const existingItemIndex = newItems.findIndex(ni => ni.name === item.name && ni.unit === item.unit);
+            if (existingItemIndex !== -1) {
+              const existingItem = newItems[existingItemIndex];
+              if (!existingItem.branchIds.includes(toBranchId)) {
+                newItems[existingItemIndex] = {
+                  ...existingItem,
+                  branchIds: [...existingItem.branchIds, toBranchId]
+                };
+              }
+            } else {
+              newItems.push({
+                ...item,
+                id: generateId(),
+                branchIds: [toBranchId]
+              });
             }
-          } else {
-            newItems.push({
-              ...item,
-              id: generateId(),
-              branchIds: [toBranchId]
-            });
-          }
+          });
+          
+          return { inventoryItems: newItems };
         });
-        
-        return { inventoryItems: newItems };
-      }),
+        get().addNotification('تم نسخ الأصناف بنجاح', 'success');
+      },
 
-      addOperationalItem: (item) => set((state) => ({ operationalItems: [...state.operationalItems, { ...item, id: generateId() }] })),
-      updateOperationalItem: (id, item) => set((state) => ({ operationalItems: state.operationalItems.map(i => i.id === id ? { ...i, ...item } : i) })),
-      deleteOperationalItem: (id) => set((state) => ({ operationalItems: state.operationalItems.filter(i => i.id !== id) })),
+      addOperationalItem: (item) => {
+        set((state) => ({ operationalItems: [...state.operationalItems, { ...item, id: generateId() }] }));
+        get().addNotification('تم إضافة بند التشغيل بنجاح', 'success');
+      },
+      updateOperationalItem: (id, item) => {
+        set((state) => ({ operationalItems: state.operationalItems.map(i => i.id === id ? { ...i, ...item } : i) }));
+        get().addNotification('تم تحديث بند التشغيل', 'success');
+      },
+      deleteOperationalItem: (id) => {
+        set((state) => ({ operationalItems: state.operationalItems.filter(i => i.id !== id) }));
+        get().addNotification('تم حذف بند التشغيل', 'success');
+      },
 
-      addRevenueReport: (report) => set((state) => ({ 
-        revenueReports: [...state.revenueReports, { ...report, id: generateId(), createdAt: new Date().toISOString() }],
-        revenueDrafts: state.revenueDrafts.filter(d => !(d.branchId === report.branchId && d.date === report.date))
-      })),
-      deleteRevenueReport: (id) => set((state) => ({ revenueReports: state.revenueReports.filter(r => r.id !== id) })),
-      saveRevenueDraft: (report) => set((state) => {
-        const existingIndex = state.revenueDrafts.findIndex(d => d.branchId === report.branchId && d.date === report.date);
-        const newDrafts = [...state.revenueDrafts];
-        if (existingIndex !== -1) {
-          newDrafts[existingIndex] = { ...report, id: state.revenueDrafts[existingIndex].id };
-        } else {
-          newDrafts.push({ ...report, id: generateId() });
-        }
-        return { revenueDrafts: newDrafts };
-      }),
+      changeUserPin: (id, newPin) => {
+        set((state) => ({
+          users: state.users.map(u => u.id === id ? { ...u, pin: newPin } : u),
+          currentUser: state.currentUser?.id === id ? { ...state.currentUser, pin: newPin } : state.currentUser
+        }));
+        get().addNotification('تم تغيير كلمة المرور بنجاح', 'success');
+      },
+
+      addRevenueReport: (report) => {
+        set((state) => {
+          const count = state.revenueReports.filter(r => r.date === report.date).length;
+          const referenceNumber = generateReferenceNumber(report.date, count);
+          return {  
+            revenueReports: [...state.revenueReports, { 
+              ...report, 
+              id: generateId(), 
+              createdAt: new Date().toISOString(),
+              referenceNumber,
+              status: report.status || 'pending'
+            }],
+            revenueDrafts: state.revenueDrafts.filter(d => !(d.branchId === report.branchId && d.date === report.date))
+          };
+        });
+        get().addNotification('تم إضافة تقرير الإيرادات بنجاح', 'success');
+      },
+      updateRevenueReportStatus: (id, status) => {
+        set((state) => ({
+          revenueReports: state.revenueReports.map(r => r.id === id ? { ...r, status } : r)
+        }));
+        get().addNotification(`تم تغيير حالة التقرير إلى ${status === 'approved' ? 'مقبول' : 'مرفوض'}`, 'success');
+      },
+      deleteRevenueReport: (id) => {
+        set((state) => ({ revenueReports: state.revenueReports.filter(r => r.id !== id) }));
+        get().addNotification('تم حذف التقرير', 'success');
+      },
+      saveRevenueDraft: (report) => {
+        set((state) => {
+          const existingIndex = state.revenueDrafts.findIndex(d => d.branchId === report.branchId && d.date === report.date);
+          const newDrafts = [...state.revenueDrafts];
+          if (existingIndex !== -1) {
+            newDrafts[existingIndex] = { ...report, id: state.revenueDrafts[existingIndex].id, referenceNumber: '', createdAt: '', status: 'draft' };
+          } else {
+            newDrafts.push({ ...report, id: generateId(), referenceNumber: '', createdAt: '', status: 'draft' });
+          }
+          return { revenueDrafts: newDrafts };
+        });
+        get().addNotification('تم حفظ المسودة', 'success');
+      },
       deleteRevenueDraft: (branchId, date) => set((state) => ({
         revenueDrafts: state.revenueDrafts.filter(d => !(d.branchId === branchId && d.date === date))
       })),
 
-      addInventoryReport: (report) => set((state) => ({ inventoryReports: [...state.inventoryReports, { ...report, id: generateId(), createdAt: new Date().toISOString() }] })),
-      deleteInventoryReport: (id) => set((state) => ({ inventoryReports: state.inventoryReports.filter(r => r.id !== id) })),
+      addInventoryReport: (report) => {
+        set((state) => {
+          const count = state.inventoryReports.filter(r => r.date === report.date).length;
+          const referenceNumber = generateReferenceNumber(report.date, count);
+          return { 
+            inventoryReports: [...state.inventoryReports, { 
+              ...report, 
+              id: generateId(), 
+              createdAt: new Date().toISOString(),
+              referenceNumber,
+              status: report.status || 'pending'
+            }] 
+          };
+        });
+        get().addNotification('تم إضافة تقرير الجرد بنجاح', 'success');
+      },
+      updateInventoryReportStatus: (id, status) => {
+        set((state) => ({
+          inventoryReports: state.inventoryReports.map(r => r.id === id ? { ...r, status } : r)
+        }));
+        get().addNotification(`تم تغيير حالة التقرير إلى ${status === 'approved' ? 'مقبول' : 'مرفوض'}`, 'success');
+      },
+      deleteInventoryReport: (id) => {
+        set((state) => ({ inventoryReports: state.inventoryReports.filter(r => r.id !== id) }));
+        get().addNotification('تم حذف التقرير', 'success');
+      },
 
-      addInspectionReport: (report) => set((state) => ({ inspectionReports: [...state.inspectionReports, { ...report, id: generateId(), createdAt: new Date().toISOString() }] })),
-      deleteInspectionReport: (id) => set((state) => ({ inspectionReports: state.inspectionReports.filter(r => r.id !== id) })),
+      addInspectionReport: (report) => {
+        set((state) => {
+          const count = state.inspectionReports.filter(r => r.date === report.date).length;
+          const referenceNumber = generateReferenceNumber(report.date, count);
+          return { 
+            inspectionReports: [...state.inspectionReports, { 
+              ...report, 
+              id: generateId(), 
+              createdAt: new Date().toISOString(),
+              referenceNumber
+            }] 
+          };
+        });
+        get().addNotification('تم إضافة تقرير التشغيل بنجاح', 'success');
+      },
+      deleteInspectionReport: (id) => {
+        set((state) => ({ inspectionReports: state.inspectionReports.filter(r => r.id !== id) }));
+        get().addNotification('تم حذف التقرير', 'success');
+      },
 
-      addScheduledReadingItem: (item) => set((state) => ({ scheduledReadingItems: [...state.scheduledReadingItems, { ...item, id: generateId() }] })),
-      updateScheduledReadingItem: (id, item) => set((state) => ({ scheduledReadingItems: state.scheduledReadingItems.map(i => i.id === id ? { ...i, ...item } : i) })),
-      deleteScheduledReadingItem: (id) => set((state) => ({ scheduledReadingItems: state.scheduledReadingItems.filter(i => i.id !== id) })),
+      addScheduledReadingItem: (item) => {
+        set((state) => ({ scheduledReadingItems: [...state.scheduledReadingItems, { ...item, id: generateId() }] }));
+        get().addNotification('تم إضافة العنصر المجدول', 'success');
+      },
+      updateScheduledReadingItem: (id, item) => {
+        set((state) => ({ scheduledReadingItems: state.scheduledReadingItems.map(i => i.id === id ? { ...i, ...item } : i) }));
+        get().addNotification('تم تحديث العنصر', 'success');
+      },
+      deleteScheduledReadingItem: (id) => {
+        set((state) => ({ scheduledReadingItems: state.scheduledReadingItems.filter(i => i.id !== id) }));
+        get().addNotification('تم حذف العنصر', 'success');
+      },
 
-      addReadingRecord: (record) => set((state) => ({ readingRecords: [...state.readingRecords, { ...record, id: generateId(), createdAt: new Date().toISOString() }] })),
-      deleteReadingRecord: (id) => set((state) => ({ readingRecords: state.readingRecords.filter(r => r.id !== id) })),
+      addReadingRecord: (record) => {
+        set((state) => {
+          const count = state.readingRecords.filter(r => r.date === record.date).length;
+          const referenceNumber = generateReferenceNumber(record.date, count);
+          return { 
+            readingRecords: [...state.readingRecords, { 
+              ...record, 
+              id: generateId(), 
+              createdAt: new Date().toISOString(),
+              referenceNumber
+            }] 
+          };
+        });
+        get().addNotification('تم تسجيل القراءة بنجاح', 'success');
+      },
+      deleteReadingRecord: (id) => {
+        set((state) => ({ readingRecords: state.readingRecords.filter(r => r.id !== id) }));
+        get().addNotification('تم حذف القراءة', 'success');
+      },
 
-      addTicket: (ticket) => set((state) => {
-        const id = generateId();
-        const historyEntry: TicketHistory = {
-          id: generateId(),
-          type: 'creation',
-          date: new Date().toISOString(),
-          authorId: state.currentUser!.id,
-        };
-        return { 
-          tickets: [...state.tickets, { ...ticket, id, history: [historyEntry] }] 
-        };
-      }),
-      updateTicketStatus: (id, status) => set((state) => ({ 
-        tickets: state.tickets.map(t => {
-          if (t.id === id) {
-            const historyEntry: TicketHistory = {
-              id: generateId(),
-              type: 'status_change',
-              date: new Date().toISOString(),
-              authorId: state.currentUser!.id,
-              oldStatus: t.status,
-              newStatus: status
-            };
-            return { ...t, status, history: [...(t.history || []), historyEntry] };
-          }
-          return t;
-        }) 
-      })),
-      addTicketComment: (ticketId, comment) => set((state) => ({
-        tickets: state.tickets.map(t => {
-          if (t.id === ticketId) {
-            const historyEntry: TicketHistory = {
-              id: generateId(),
-              type: 'comment',
-              date: new Date().toISOString(),
-              authorId: state.currentUser!.id,
-              text: comment.text
-            };
-            return { 
-              ...t, 
-              comments: [...(t.comments || []), { ...comment, id: generateId() }],
-              history: [...(t.history || []), historyEntry]
-            };
-          }
-          return t;
-        })
-      })),
-      deleteTicket: (id) => set((state) => ({ tickets: state.tickets.filter(t => t.id !== id) })),
+      addTicket: (ticket) => {
+        set((state) => {
+          const id = generateId();
+          const count = state.tickets.filter(t => t.date === ticket.date).length;
+          const referenceNumber = generateReferenceNumber(ticket.date, count);
+          
+          const historyEntry: TicketHistory = {
+            id: generateId(),
+            type: 'creation',
+            date: new Date().toISOString(),
+            authorId: state.currentUser!.id,
+          };
+          return { 
+            tickets: [...state.tickets, { ...ticket, id, history: [historyEntry], referenceNumber }] 
+          };
+        });
+        get().addNotification('تم إنشاء التذكرة بنجاح', 'success');
+      },
+      updateTicketStatus: (id, status) => {
+        set((state) => ({ 
+          tickets: state.tickets.map(t => {
+            if (t.id === id) {
+              const historyEntry: TicketHistory = {
+                id: generateId(),
+                type: 'status_change',
+                date: new Date().toISOString(),
+                authorId: state.currentUser!.id,
+                oldStatus: t.status,
+                newStatus: status
+              };
+              return { ...t, status, history: [...(t.history || []), historyEntry] };
+            }
+            return t;
+          }) 
+        }));
+        get().addNotification('تم تحديث حالة التذكرة', 'success');
+      },
+      addTicketComment: (ticketId, comment) => {
+        set((state) => ({
+          tickets: state.tickets.map(t => {
+            if (t.id === ticketId) {
+              const historyEntry: TicketHistory = {
+                id: generateId(),
+                type: 'comment',
+                date: new Date().toISOString(),
+                authorId: state.currentUser!.id,
+                text: comment.text
+              };
+              return { 
+                ...t, 
+                comments: [...(t.comments || []), { ...comment, id: generateId() }],
+                history: [...(t.history || []), historyEntry]
+              };
+            }
+            return t;
+          })
+        }));
+        get().addNotification('تم إضافة التعليق', 'success');
+      },
+      deleteTicket: (id) => {
+        set((state) => ({ tickets: state.tickets.filter(t => t.id !== id) }));
+        get().addNotification('تم حذف التذكرة', 'success');
+      },
     }),
     {
       name: 'restaurant-system-storage',

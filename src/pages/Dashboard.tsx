@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
+import { useNavigate } from 'react-router-dom';
 import { Activity, DollarSign, Package, Wrench, Calendar, Building2, Filter, Clock, CheckCircle2, AlertCircle, User } from 'lucide-react';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
   const { currentUser, customRoles, branches, revenueReports, inventoryReports, tickets, scheduledReadingItems, readingRecords, users } = useStore();
+  const navigate = useNavigate();
   
   const [dateRange, setDateRange] = useState({
     start: startOfWeek(new Date(), { weekStartsOn: 6 }).toISOString().split('T')[0],
@@ -15,6 +17,18 @@ export default function Dashboard() {
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
+
+  useEffect(() => {
+    if (userRole?.permissions.includes('view_maintenance_only')) {
+      navigate('/maintenance', { replace: true });
+    } else if (userRole?.permissions.includes('view_inventory_only')) {
+      navigate('/need-report', { replace: true });
+    }
+  }, [userRole, navigate]);
+
+  if (userRole?.permissions.includes('view_maintenance_only') || userRole?.permissions.includes('view_inventory_only')) {
+    return null; // Render nothing while redirecting
+  }
 
   const filterByDateAndBranch = (data: any[]) => {
     return data.filter(item => {
@@ -32,11 +46,62 @@ export default function Dashboard() {
   const filteredInventory = filterByDateAndBranch(inventoryReports);
   const filteredTickets = filterByDateAndBranch(tickets);
 
+  const complianceStats = useMemo(() => {
+    const start = parseISO(dateRange.start);
+    const end = parseISO(dateRange.end);
+    const days = [];
+    let current = start;
+    while (current <= end) {
+      days.push(format(current, 'yyyy-MM-dd'));
+      current.setDate(current.getDate() + 1);
+    }
+
+    let missedCount = 0;
+    let lateCount = 0;
+    let onTimeCount = 0;
+
+    const relevantBranches = selectedBranch === 'all' 
+      ? (canViewAll ? branches.map(b => b.id) : [currentUser?.branchId])
+      : [selectedBranch];
+
+    days.forEach(day => {
+      relevantBranches.forEach(branchId => {
+        if (!branchId) return;
+        scheduledReadingItems.forEach(item => {
+          const record = readingRecords.find(r => r.itemId === item.id && r.branchId === branchId && r.date === day);
+          
+          if (record) {
+            // Check if late (simple string comparison works for HH:mm in 24h format)
+            if (record.time > item.scheduledTime) {
+              lateCount++;
+            } else {
+              onTimeCount++;
+            }
+          } else {
+            // If day is today, check if time passed
+            if (day === format(new Date(), 'yyyy-MM-dd')) {
+              const now = format(new Date(), 'HH:mm');
+              if (now > item.scheduledTime) {
+                missedCount++;
+              }
+            } else if (day < format(new Date(), 'yyyy-MM-dd')) {
+              // Past day, definitely missed
+              missedCount++;
+            }
+          }
+        });
+      });
+    });
+
+    return { missed: missedCount, late: lateCount, onTime: onTimeCount };
+  }, [dateRange, scheduledReadingItems, readingRecords, selectedBranch, canViewAll, currentUser, branches]);
+
   const stats = [
     { name: 'إجمالي الإيرادات', value: filteredRevenue.length, icon: DollarSign, color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
     { name: 'تقارير الجرد', value: filteredInventory.length, icon: Package, color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
     { name: 'طلبات الصيانة المفتوحة', value: filteredTickets.filter(t => t.type === 'maintenance' && t.status !== 'closed').length, icon: Wrench, color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' },
-    { name: 'طلبات الشراء المفتوحة', value: filteredTickets.filter(t => t.type === 'purchase' && t.status !== 'closed').length, icon: Activity, color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
+    { name: 'تقارير فائتة', value: complianceStats.missed, icon: AlertCircle, color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
+    { name: 'تقارير متأخرة', value: complianceStats.late, icon: Clock, color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
   ];
 
   const scheduledReadingsStatus = useMemo(() => {

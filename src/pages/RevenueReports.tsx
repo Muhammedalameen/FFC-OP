@@ -1,25 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { TrendingUp, Package, DollarSign, Calendar, BarChart3, ArrowUpRight, ArrowDownRight, Filter, Building2, Printer, Check, Clock, X } from 'lucide-react';
+import { DollarSign, Calendar, BarChart3, ArrowUpRight, Building2, Printer, Check, Clock, Filter, X } from 'lucide-react';
 import { 
   format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, 
-  startOfYear, endOfYear, isAfter, isBefore, parseISO, isWithinInterval,
+  startOfYear, endOfYear, parseISO, isWithinInterval,
   subWeeks, subMonths, subYears, startOfDay, endOfDay
 } from 'date-fns';
 import { printReport } from '../lib/exportUtils';
 import { cn } from '../lib/utils';
 
-export default function Reports() {
-  const { inventoryReports, branches, inventoryItems } = useStore();
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+export default function RevenueReports() {
+  const { revenueReports, branches } = useStore();
   
-  // Applied Filters
-  const [appliedProduct, setAppliedProduct] = useState<string>('all');
+  // Applied Filters (Used for calculation)
   const [appliedBranches, setAppliedBranches] = useState<string[]>(['all']);
   const [appliedDateFilter, setAppliedDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
   const [appliedCustomRange, setAppliedCustomRange] = useState({ start: '', end: '' });
 
-  // Temporary State
-  const [tempProduct, setTempProduct] = useState<string>('all');
+  // Temporary State (For UI controls)
   const [tempBranches, setTempBranches] = useState<string[]>(['all']);
   const [tempDateFilter, setTempDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
   const [tempCustomRange, setTempCustomRange] = useState({ start: '', end: '' });
@@ -57,30 +57,46 @@ export default function Reports() {
     }
   }, [appliedDateFilter, appliedCustomRange]);
 
-  const stats = useMemo(() => {
-    const filteredInventory = inventoryReports.filter(r => {
+  const { stats, chartData } = useMemo(() => {
+    const filteredRevenue = revenueReports.filter(r => {
       const date = parseISO(r.date);
       const inRange = isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
       const inBranch = appliedBranches.includes('all') || appliedBranches.includes(r.branchId);
       return inRange && inBranch;
     });
 
+    // Revenue Calculations
+    const totalRevenue = filteredRevenue.reduce((sum, r) => 
+      sum + r.shifts.reduce((sSum, s) => sSum + s.cash + s.pos + s.delivery, 0), 0);
+    
     const daysDiff = Math.max(1, Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24)));
 
-    // Inventory Consumption Calculations
-    const totalConsumption = filteredInventory.reduce((sum, r) => 
-      sum + r.items
-        .filter(i => appliedProduct === 'all' || i.itemId === appliedProduct)
-        .reduce((iSum, i) => iSum + i.consumption, 0), 0);
+    // Chart Data
+    const grouped = filteredRevenue.reduce((acc, r) => {
+      const date = r.date;
+      const total = r.shifts.reduce((sum, s) => sum + s.cash + s.pos + s.delivery, 0);
+      acc[date] = (acc[date] || 0) + total;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const chartData = Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => ({
+        date: format(parseISO(date), 'MM/dd'),
+        revenue: total
+      }));
 
     return {
-      consumption: {
-        total: totalConsumption,
-        daily: totalConsumption / daysDiff,
+      stats: {
+        revenue: {
+          total: totalRevenue,
+          daily: totalRevenue / daysDiff,
+        },
+        days: daysDiff
       },
-      days: daysDiff
+      chartData
     };
-  }, [inventoryReports, appliedBranches, appliedProduct, dateRange]);
+  }, [revenueReports, appliedBranches, dateRange]);
 
   const toggleBranch = (id: string) => {
     if (id === 'all') {
@@ -99,43 +115,38 @@ export default function Reports() {
 
   const applyFilters = () => {
     setAppliedBranches(tempBranches);
-    setAppliedProduct(tempProduct);
     setAppliedDateFilter(tempDateFilter);
     setAppliedCustomRange(tempCustomRange);
   };
 
   const clearFilters = () => {
     setTempBranches(['all']);
-    setTempProduct('all');
     setTempDateFilter('thisMonth');
     setTempCustomRange({ start: '', end: '' });
     
     setAppliedBranches(['all']);
-    setAppliedProduct('all');
     setAppliedDateFilter('thisMonth');
     setAppliedCustomRange({ start: '', end: '' });
   };
 
   const handlePrint = () => {
-    const productName = appliedProduct === 'all' ? 'كافة المنتجات' : inventoryItems.find(i => i.id === appliedProduct)?.name;
     const branchNames = appliedBranches.includes('all') ? 'كافة الفروع' : branches.filter(b => appliedBranches.includes(b.id)).map(b => b.name).join(', ');
     const dateRangeStr = `${format(dateRange.start, 'yyyy-MM-dd')} إلى ${format(dateRange.end, 'yyyy-MM-dd')}`;
 
     const content = `
       <div dir="rtl" style="font-family: sans-serif; padding: 20px;">
-        <h1 style="text-align: center; color: #4f46e5;">تقرير الاستهلاك</h1>
+        <h1 style="text-align: center; color: #4f46e5;">تقرير الإيرادات</h1>
         <div style="margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
           <p><strong>الفروع:</strong> ${branchNames}</p>
-          <p><strong>المنتج:</strong> ${productName}</p>
           <p><strong>الفترة:</strong> ${dateRangeStr}</p>
           <p><strong>تاريخ الاستخراج:</strong> ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr; gap: 40px;">
           <div>
-            <h2 style="color: #2563eb; border-right: 4px solid #2563eb; padding-right: 10px;">الاستهلاك</h2>
-            <p><strong>الإجمالي للفترة:</strong> ${stats.consumption.total.toLocaleString()} وحدة</p>
-            <p><strong>المتوسط اليومي:</strong> ${stats.consumption.daily.toLocaleString()} وحدة</p>
+            <h2 style="color: #059669; border-right: 4px solid #059669; padding-right: 10px;">الإيرادات</h2>
+            <p><strong>الإجمالي للفترة:</strong> ${stats.revenue.total.toLocaleString()} ر.س</p>
+            <p><strong>المتوسط اليومي:</strong> ${stats.revenue.daily.toLocaleString()} ر.س</p>
           </div>
         </div>
       </div>
@@ -146,7 +157,7 @@ export default function Reports() {
   return (
     <div className="space-y-8" dir="rtl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">تقارير الاستهلاك</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">تقارير الإيرادات</h1>
         <div className="flex items-center gap-3">
           <button 
             onClick={handlePrint}
@@ -164,7 +175,7 @@ export default function Reports() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Clock size={18} className="text-indigo-600" />
@@ -242,25 +253,8 @@ export default function Reports() {
               ))}
             </div>
           </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Package size={18} className="text-indigo-600" />
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">تصفية حسب المنتج</h3>
-            </div>
-            <select
-              value={tempProduct}
-              onChange={(e) => setTempProduct(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="all">كافة المنتجات</option>
-              {inventoryItems.map(item => (
-                <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
-              ))}
-            </select>
-          </div>
         </div>
-
+        
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
           <button 
             onClick={clearFilters}
@@ -279,43 +273,43 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Consumption Section */}
+      {/* Revenue Section */}
       <section className="space-y-4">
 
         <div className="flex items-center gap-2 mb-2">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-            <Package size={20} />
+          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
+            <DollarSign size={20} />
           </div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">تحليل الاستهلاك</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">متوسط الإيرادات</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ReportCard 
-            title="إجمالي الاستهلاك" 
-            value={stats.consumption.total} 
+            title="إجمالي الإيرادات" 
+            value={stats.revenue.total} 
             subtitle={`إجمالي الفترة (${stats.days} يوم)`}
-            icon={<Package size={24} />}
-            color="blue"
+            icon={<DollarSign size={24} />}
+            color="emerald"
           />
           <ReportCard 
             title="المتوسط اليومي" 
-            value={stats.consumption.daily} 
-            subtitle="متوسط الاستهلاك لكل يوم"
+            value={stats.revenue.daily} 
+            subtitle="متوسط الإيراد لكل يوم"
             icon={<BarChart3 size={24} />}
-            color="violet"
+            color="indigo"
           />
           <ReportCard 
-            title="كفاءة التوريد" 
-            value={100} 
-            subtitle="نسبة توفر المنتج"
-            icon={<TrendingUp size={24} />}
-            color="rose"
-            isPercent
+            title="نطاق الفترة" 
+            value={stats.days} 
+            subtitle="عدد الأيام المختارة"
+            icon={<Calendar size={24} />}
+            color="amber"
+            isCount
           />
         </div>
       </section>
 
-      {/* Detailed Breakdown (Optional Placeholder) */}
+      {/* Detailed Breakdown */}
       <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white">
@@ -326,8 +320,49 @@ export default function Reports() {
             <p className="text-gray-500 dark:text-slate-400 text-sm">تحليل البيانات التاريخية للفروع</p>
           </div>
         </div>
-        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-2xl">
-          <p className="text-gray-400 dark:text-slate-600 italic">سيتم إضافة رسوم بيانية تفصيلية هنا قريباً</p>
+        <div className="h-80 w-full">
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 12 }} 
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 12 }} 
+                  tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ stroke: '#4f46e5', strokeWidth: 2 }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#4f46e5" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorRevenue)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-2xl">
+              <p className="text-gray-400 dark:text-slate-600 italic">لا توجد بيانات كافية للعرض</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -18,6 +18,8 @@ import { format, parse, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns
 import { ar } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 
+import { compressImage } from '../lib/imageUtils';
+
 export default function ScheduledReadings() {
   const { 
     scheduledReadingItems, 
@@ -37,19 +39,21 @@ export default function ScheduledReadings() {
     return readingRecords.filter(r => r.date === dateStr && r.branchId === selectedBranchId);
   }, [readingRecords, dateStr, selectedBranchId]);
 
-  const handleImageUpload = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTempImages(prev => ({ ...prev, [itemId]: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImage(file);
+      setTempImages(prev => ({ ...prev, [itemId]: compressed }));
     }
   };
 
   const handleSaveReading = (itemId: string, value: string | number | boolean) => {
     if (!currentUser) return;
+
+    if (!tempImages[itemId]) {
+      alert('عذراً، لا يمكن حفظ القراءة بدون التقاط صورة توثيقية');
+      return;
+    }
 
     addReadingRecord({
       branchId: selectedBranchId,
@@ -214,6 +218,7 @@ export default function ScheduledReadings() {
                                   <input
                                     type="file"
                                     accept="image/*"
+                                    capture="environment"
                                     onChange={(e) => handleImageUpload(item.id, e)}
                                     className="absolute inset-0 opacity-0 cursor-pointer w-10 h-10"
                                     id={`img-${item.id}`}
@@ -252,10 +257,10 @@ export default function ScheduledReadings() {
                               <div className="flex items-center gap-2">
                                 <input
                                   type="number"
-                                  placeholder="القيمة"
-                                  className="w-24 p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 text-center"
+                                  placeholder={tempImages[item.id] ? "القيمة" : "صورة أولاً"}
+                                  className="w-24 p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 text-center disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-800"
                                   defaultValue={record?.value as number}
-                                  disabled={isCompleted}
+                                  disabled={isCompleted || !tempImages[item.id]}
                                   onBlur={(e) => {
                                     if (!isCompleted && e.target.value !== '') {
                                       handleSaveReading(item.id, parseFloat(e.target.value));
@@ -267,11 +272,14 @@ export default function ScheduledReadings() {
                             ) : (
                               <button
                                 onClick={() => !isCompleted && handleSaveReading(item.id, true)}
+                                disabled={isCompleted || !tempImages[item.id]}
                                 className={cn(
                                   "px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2",
                                   isCompleted
                                     ? "bg-green-100 text-green-700 cursor-default"
-                                    : "bg-blue-600 text-white hover:bg-blue-700"
+                                    : !tempImages[item.id]
+                                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                      : "bg-blue-600 text-white hover:bg-blue-700"
                                 )}
                               >
                                 {isCompleted ? (

@@ -48,7 +48,7 @@ export default function Inspection() {
       branchId,
       date,
       items,
-      createdBy: currentUser!.id,
+      createdBy: currentUser!.id
     });
     setIsAdding(false);
   };

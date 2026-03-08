@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, MessageSquare, Image as ImageIcon, Paperclip, Calendar, Building2, Search, Filter, AlertCircle, Package, DollarSign } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 
+import { compressImage } from '../lib/imageUtils';
+
 interface TicketsProps {
   type: 'maintenance' | 'purchase';
 }
@@ -40,22 +42,22 @@ export default function Tickets({ type }: TicketsProps) {
   const titleText = type === 'maintenance' ? 'طلبات الصيانة' : 'طلبات الشراء';
   const newText = type === 'maintenance' ? 'طلب صيانة جديد' : 'طلب شراء جديد';
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      Array.from(files).forEach((file: File) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImages(prev => [...prev, reader.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
+      const compressedImages = await Promise.all(Array.from(files).map((file: any) => compressImage(file)));
+      setImages(prev => [...prev, ...compressedImages]);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!branchId) return;
+
+    if (type === 'maintenance' && images.length === 0) {
+      alert('عذراً، لا بد من إرفاق صورة واحدة على الأقل لطلب الصيانة');
+      return;
+    }
 
     addTicket({
       branchId,
@@ -294,7 +296,14 @@ export default function Tickets({ type }: TicketsProps) {
                 <label className="cursor-pointer bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 px-6 py-3 rounded-2xl hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 transition-all font-bold">
                   <ImageIcon size={20} />
                   <span>اختر صور</span>
-                  <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageUpload}
+                    capture={type === 'maintenance' ? "environment" : undefined}
+                  />
                 </label>
                 <span className="text-sm text-gray-500 dark:text-slate-400 font-medium">{images.length} صورة مرفقة</span>
               </div>
@@ -341,7 +350,7 @@ export default function Tickets({ type }: TicketsProps) {
               <div className="flex justify-between items-start mb-4">
                 <div className="space-y-1">
                   <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 transition-colors">{ticket.title}</h3>
-                  <span className="text-[10px] font-mono text-gray-400">#{(ticket.id || '').toUpperCase().slice(0, 8)}</span>
+                  <span className="text-[10px] font-mono text-gray-400">#{ticket.referenceNumber || (ticket.id || '').toUpperCase().slice(0, 8)}</span>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap ${
                   ticket.status === 'open' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
