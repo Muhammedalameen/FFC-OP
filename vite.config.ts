@@ -12,27 +12,8 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
-        manifest: {
-          name: 'نظام المتابعة - شركة سريع',
-          short_name: 'سريع',
-          description: 'نظام المتابعة لشركة سريع الغذائية',
-          theme_color: '#4f46e5',
-          background_color: '#ffffff',
-          display: 'standalone',
-          dir: 'rtl',
-          icons: [
-            {
-              src: 'https://i.ibb.co/8L8Wx06M/Logo-Saree-1.png',
-              sizes: '192x192',
-              type: 'image/png'
-            },
-            {
-              src: 'https://i.ibb.co/8L8Wx06M/Logo-Saree-1.png',
-              sizes: '512x512',
-              type: 'image/png'
-            }
-          ]
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         }
       })
     ],
