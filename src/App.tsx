@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -12,6 +13,8 @@ import TicketDetails from './pages/TicketDetails';
 import Admin from './pages/Admin';
 import Reports from './pages/Reports';
 import ScheduledReadings from './pages/ScheduledReadings';
+import RevenueReports from './pages/RevenueReports';
+import LoadingScreen from './components/LoadingScreen';
 import { useStore } from './store';
 
 // Protected Route Component
@@ -23,10 +26,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-import RevenueReports from './pages/RevenueReports';
-
 export default function App() {
-  const { theme } = useStore();
+  const { theme, checkDbConnection } = useStore();
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      await checkDbConnection();
+      // Add a small delay to show the nice animation
+      setTimeout(() => {
+        setIsInitialLoading(false);
+      }, 1500);
+    };
+    init();
+  }, [checkDbConnection]);
 
   useEffect(() => {
     const applyTheme = () => {
@@ -49,25 +62,33 @@ export default function App() {
   }, [theme]);
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<Dashboard />} />
-          <Route path="revenue" element={<Revenue />} />
-          <Route path="revenue-reports" element={<RevenueReports />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="need-report" element={<NeedReport />} />
-          <Route path="inspection" element={<Inspection />} />
-          <Route path="scheduled-readings" element={<ScheduledReadings />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="maintenance" element={<Tickets type="maintenance" />} />
-          <Route path="purchase" element={<Tickets type="purchase" />} />
-          <Route path="ticket/:id" element={<TicketDetails />} />
-          <Route path="admin/*" element={<Admin />} />
-        </Route>
-      </Routes>
-    </Router>
+    <>
+      <AnimatePresence>
+        {isInitialLoading && <LoadingScreen message="جاري التحقق من الاتصال بقاعدة البيانات..." />}
+      </AnimatePresence>
+
+      {!isInitialLoading && (
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route index element={<Dashboard />} />
+              <Route path="revenue" element={<Revenue />} />
+              <Route path="revenue-reports" element={<RevenueReports />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="need-report" element={<NeedReport />} />
+              <Route path="inspection" element={<Inspection />} />
+              <Route path="scheduled-readings" element={<ScheduledReadings />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="maintenance" element={<Tickets type="maintenance" />} />
+              <Route path="purchase" element={<Tickets type="purchase" />} />
+              <Route path="ticket/:id" element={<TicketDetails />} />
+              <Route path="admin/*" element={<Admin />} />
+            </Route>
+          </Routes>
+        </Router>
+      )}
+    </>
   );
 }

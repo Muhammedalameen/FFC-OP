@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem } from '../store';
-import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock } from 'lucide-react';
+import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function Admin() {
   const { 
@@ -16,6 +17,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled'>('users');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // New User State
   const [newUser, setNewUser] = useState<Omit<User, 'id'>>({ employeeId: '', pin: '', name: '', roleId: customRoles[0]?.id || '', branchId: '' });
@@ -171,6 +173,50 @@ export default function Admin() {
       setCopySource('');
       setCopyTarget('');
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedBranchId) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        let importedCount = 0;
+        data.forEach((row: any) => {
+          const name = row['اسم الصنف'] || row['name'] || row['Name'] || row['الصنف'];
+          const category = row['مجموعة المنتج'] || row['التصنيف'] || row['category'] || row['Category'] || 'عام';
+          const unit = row['الوحدة'] || row['unit'] || row['Unit'] || 'حبة';
+          
+          if (name) {
+            addInventoryItem({
+              name: String(name).trim(),
+              category: String(category).trim(),
+              unit: String(unit).trim(),
+              branchIds: [selectedBranchId]
+            });
+            importedCount++;
+          }
+        });
+        
+        alert(`تم استيراد ${importedCount} صنف بنجاح`);
+      } catch (error) {
+        console.error('Error parsing Excel file:', error);
+        alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
+      }
+      
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const togglePermission = (permId: string) => {
@@ -624,6 +670,23 @@ export default function Admin() {
                       </h2>
                       <p className="text-sm text-gray-500 dark:text-slate-400">إدارة وتعديل الأصناف الخاصة بهذا الفرع</p>
                     </div>
+                  </div>
+                  <div>
+                    <input 
+                      type="file" 
+                      accept=".xlsx, .xls" 
+                      onChange={handleFileUpload} 
+                      className="hidden" 
+                      id="excel-upload" 
+                      ref={fileInputRef}
+                    />
+                    <label 
+                      htmlFor="excel-upload" 
+                      className="cursor-pointer bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-4 py-2 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/30 font-bold flex items-center gap-2 transition-colors border border-emerald-200 dark:border-emerald-800/50"
+                    >
+                      <Upload size={18} />
+                      <span className="hidden sm:inline">استيراد من Excel</span>
+                    </label>
                   </div>
                 </div>
 

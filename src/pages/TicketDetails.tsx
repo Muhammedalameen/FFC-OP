@@ -92,15 +92,17 @@ export default function TicketDetails() {
   const handleUpdateCost = () => {
     if (!costInput) return;
     const cost = parseFloat(costInput);
+    const now = new Date().toISOString();
     const newHistoryEvent: TicketHistory = {
       id: Math.random().toString(36).substring(2, 9),
       type: 'cost_added',
-      date: new Date().toISOString(),
+      date: now,
       authorId: currentUser!.id,
       text: `تم إدراج التكلفة التقديرية: ${cost} ر.س`
     };
     updateTicket(ticket.id, { 
       cost, 
+      costAddedAt: now,
       isCostApproved: false,
       history: [...(ticket.history || []), newHistoryEvent]
     });
@@ -108,16 +110,18 @@ export default function TicketDetails() {
   };
 
   const handleApproveCost = () => {
+    const now = new Date().toISOString();
     const newHistoryEvent: TicketHistory = {
       id: Math.random().toString(36).substring(2, 9),
       type: 'cost_approved',
-      date: new Date().toISOString(),
+      date: now,
       authorId: currentUser!.id,
       text: `تم اعتماد التكلفة`
     };
     updateTicket(ticket.id, { 
       isCostApproved: true, 
       costApprovedBy: currentUser!.id,
+      costApprovedAt: now,
       history: [...(ticket.history || []), newHistoryEvent]
     });
   };
@@ -269,12 +273,24 @@ export default function TicketDetails() {
                     <div>
                       <span className="text-xs text-gray-500 block">التكلفة المقدرة</span>
                       <span className="text-xl font-bold text-indigo-600">{ticket.cost.toLocaleString()} ر.س</span>
+                      {ticket.costAddedAt && (
+                        <span className="text-[10px] text-gray-400 block mt-1">
+                          أضيفت في: {format(new Date(ticket.costAddedAt), 'yyyy-MM-dd hh:mm a')}
+                        </span>
+                      )}
                     </div>
                     
                     {ticket.isCostApproved ? (
-                      <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-lg">
-                        <CheckCircle2 size={18} />
-                        <span className="text-sm font-bold">تم الاعتماد</span>
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-lg">
+                          <CheckCircle2 size={18} />
+                          <span className="text-sm font-bold">تم الاعتماد</span>
+                        </div>
+                        {ticket.costApprovedAt && (
+                          <span className="text-[10px] text-gray-400 mt-1">
+                            اعتمدت في: {format(new Date(ticket.costApprovedAt), 'yyyy-MM-dd hh:mm a')}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center gap-4">
@@ -507,8 +523,8 @@ export default function TicketDetails() {
                           <span>تغيير الحالة إلى <span className="text-indigo-600 dark:text-indigo-400">{statusMap[event.newStatus!].label}</span></span>
                         )}
                         {event.type === 'comment' && 'إضافة تعليق جديد'}
-                        {event.type === 'cost_added' && 'إدراج تكلفة تقديرية'}
-                        {event.type === 'cost_approved' && 'اعتماد التكلفة'}
+                        {event.type === 'cost_added' && 'وقت إدراج التكلفة التقديرية'}
+                        {event.type === 'cost_approved' && 'وقت تعميدها'}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-slate-400">
                         بواسطة: {author?.name}

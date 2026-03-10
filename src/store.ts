@@ -1,37 +1,37 @@
 import { create } from 'zustand';
 import { persist, StateStorage, createJSONStorage } from 'zustand/middleware';
 import { format } from 'date-fns';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
-
-const apiStorage: StateStorage = {
+const firebaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
-      const response = await fetch(`${API_URL}/api/store/${name}`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      return JSON.stringify(data);
+      const docRef = doc(db, 'store_data', name);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return JSON.stringify(docSnap.data().data);
+      }
+      return null;
     } catch (error) {
-      console.error('Failed to get state from API', error);
+      console.error('Failed to get state from Firebase', error);
       return null;
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
-      await fetch(`${API_URL}/api/store/${name}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: JSON.parse(value) }),
-      });
+      const docRef = doc(db, 'store_data', name);
+      await setDoc(docRef, { data: JSON.parse(value) });
     } catch (error) {
-      console.error('Failed to save state to API', error);
+      console.error('Failed to save state to Firebase', error);
     }
   },
   removeItem: async (name: string): Promise<void> => {
     try {
-      await fetch(`${API_URL}/api/store/${name}`, { method: 'DELETE' });
+      const docRef = doc(db, 'store_data', name);
+      await deleteDoc(docRef);
     } catch (error) {
-      console.error('Failed to delete state from API', error);
+      console.error('Failed to delete state from Firebase', error);
     }
   },
 };
@@ -230,8 +230,10 @@ export interface Ticket {
   equipmentName?: string;
   urgency?: 'low' | 'medium' | 'high';
   cost?: number;
+  costAddedAt?: string;
   isCostApproved?: boolean;
   costApprovedBy?: string;
+  costApprovedAt?: string;
   // Purchase specific
   items?: { name: string; quantity: number; unit: string }[];
   estimatedCost?: number;
@@ -259,8 +261,10 @@ interface AppState {
   currentUser: User | null;
   theme: 'light' | 'dark' | 'system';
   notifications: Notification[];
+  isDbConnected: boolean | null;
   
   // Actions
+  checkDbConnection: () => Promise<void>;
   login: (employeeId: string, pin: string) => boolean;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -433,6 +437,19 @@ export const useStore = create<AppState>()(
       currentUser: null,
       theme: 'system',
       notifications: [],
+      isDbConnected: null,
+
+      checkDbConnection: async () => {
+        try {
+          // A simple query to check if Firestore is reachable
+          const docRef = doc(db, 'health_check', 'ping');
+          await setDoc(docRef, { timestamp: new Date().toISOString() });
+          set({ isDbConnected: true });
+        } catch (error) {
+          console.error('Database connection check failed', error);
+          set({ isDbConnected: false });
+        }
+      },
 
       login: (employeeId, pin) => {
         const user = get().users.find(u => u.employeeId === employeeId && u.pin === pin);
@@ -760,7 +777,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'restaurant-system-storage',
-      storage: createJSONStorage(() => apiStorage),
+      storage: createJSONStorage(() => firebaseStorage),
     }
   )
 );

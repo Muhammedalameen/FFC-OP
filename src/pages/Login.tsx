@@ -1,28 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { Lock, User, ChefHat, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Lock, User, ChefHat, ArrowRight, Database, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function Login() {
   const [employeeId, setEmployeeId] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
-  const login = useStore((state) => state.login);
+  const [isChecking, setIsChecking] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const { login, isDbConnected, checkDbConnection } = useStore();
   const navigate = useNavigate();
+
+  const handleCheckConnection = async () => {
+    setIsChecking(true);
+    await checkDbConnection();
+    setIsChecking(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(employeeId, pin);
-    if (success) {
-      navigate('/');
-    } else {
-      setError('الرقم الوظيفي أو كود الدخول غير صحيح');
-    }
+    if (isDbConnected === false) return;
+    
+    setIsLoggingIn(true);
+    
+    // Simulate network delay for the loading screen
+    setTimeout(() => {
+      const success = login(employeeId, pin);
+      if (success) {
+        navigate('/');
+      } else {
+        setError('الرقم الوظيفي أو كود الدخول غير صحيح');
+        setIsLoggingIn(false);
+      }
+    }, 1500);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors duration-200" dir="rtl">
+    <>
+      <AnimatePresence>
+        {isLoggingIn && <LoadingScreen message="جاري تسجيل الدخول..." />}
+      </AnimatePresence>
+      
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors duration-200" dir="rtl">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -53,6 +75,50 @@ export default function Login() {
         </div>
         
         <form onSubmit={handleSubmit} className="p-10 space-y-8">
+          <AnimatePresence mode="wait">
+            {isDbConnected === false && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-4 overflow-hidden"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-xl text-amber-600 dark:text-amber-400">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200 mb-1">فشل الاتصال بقاعدة البيانات</h3>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed mb-3">
+                      لا يمكن تسجيل الدخول حالياً بسبب وجود مشكلة في الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت أو المحاولة مرة أخرى.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCheckConnection}
+                      disabled={isChecking}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw size={14} className={isChecking ? 'animate-spin' : ''} />
+                      {isChecking ? 'جاري التحقق...' : 'إعادة محاولة الاتصال'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {isDbConnected === true && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/30 rounded-2xl p-3 flex items-center gap-2 overflow-hidden"
+              >
+                <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
+                <span className="text-xs font-bold text-green-800 dark:text-green-200">تم تأكيد الاتصال بقاعدة البيانات</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {error && (
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
@@ -100,40 +166,27 @@ export default function Login() {
           </div>
 
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={isDbConnected !== false ? { scale: 1.02 } : {}}
+            whileTap={isDbConnected !== false ? { scale: 0.98 } : {}}
             type="submit"
-            className="w-full flex items-center justify-center gap-2 py-4 px-6 border border-transparent rounded-2xl shadow-lg shadow-indigo-500/20 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all"
+            disabled={isDbConnected === false || isDbConnected === null}
+            className="w-full flex items-center justify-center gap-2 py-4 px-6 border border-transparent rounded-2xl shadow-lg shadow-indigo-500/20 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            تسجيل الدخول
-            <ArrowRight className="h-5 w-5 rotate-180" />
+            {isDbConnected === null ? (
+              <>
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                جاري التحقق من الاتصال...
+              </>
+            ) : (
+              <>
+                تسجيل الدخول
+                <ArrowRight className="h-5 w-5 rotate-180" />
+              </>
+            )}
           </motion.button>
-          
-          <div className="pt-6 border-t border-gray-100 dark:border-slate-800">
-            <p className="text-center text-xs font-medium text-gray-500 dark:text-slate-400 mb-4">بيانات تجريبية سريعة</p>
-            <div className="grid grid-cols-1 gap-3">
-              {[
-                { label: 'مدير النظام', id: 'admin', pin: 'admin' },
-                { label: 'مدير منطقة', id: '1001', pin: '1234' },
-                { label: 'موظف فرع', id: '2001', pin: '1234' }
-              ].map((demo) => (
-                <button
-                  key={demo.id}
-                  type="button"
-                  onClick={() => {
-                    setEmployeeId(demo.id);
-                    setPin(demo.pin);
-                  }}
-                  className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-800/50 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl text-sm font-medium text-gray-600 dark:text-slate-300 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-slate-700"
-                >
-                  <span>{demo.label}</span>
-                  <span className="text-xs text-gray-400 font-mono">{demo.id} / {demo.pin}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </form>
       </motion.div>
     </div>
+    </>
   );
 }

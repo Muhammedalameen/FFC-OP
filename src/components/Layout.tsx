@@ -33,7 +33,6 @@ export default function Layout() {
   const { currentUser, customRoles, logout, theme, setTheme, changeUserPin, revenueReports, inventoryReports, notifications, removeNotification } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -138,40 +137,51 @@ export default function Layout() {
           />
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">نظام المتابعة</h1>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-gray-600 dark:text-slate-400 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
+          >
+            {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
+          <button 
+            onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+            className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold border border-white dark:border-slate-900 shadow-sm"
+          >
+            {currentUser.name.charAt(0)}
           </button>
         </div>
       </div>
 
-      {/* Sidebar */}
+      {/* Mobile User Dropdown */}
+      {isUserDropdownOpen && (
+        <div className="md:hidden fixed top-16 left-4 right-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-2 animate-in slide-in-from-top-2 duration-200 z-50">
+          <div className="p-3 border-b border-gray-100 dark:border-slate-800 mb-2">
+            <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
+            <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
+          </div>
+          <button
+            onClick={() => { setIsChangePasswordOpen(true); setIsUserDropdownOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
+          >
+            <KeyRound size={18} />
+            تغيير كلمة المرور
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors font-medium"
+          >
+            <LogOut size={18} />
+            تسجيل الخروج
+          </button>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
       <aside className={cn(
-        "bg-white dark:bg-slate-900 shadow-lg flex-shrink-0 md:flex flex-col transition-all duration-300 z-50 border-l border-gray-100 dark:border-slate-800 print:hidden",
-        isMobileMenuOpen ? "fixed inset-0 w-full h-full animate-in slide-in-from-right-10 fade-in duration-200" : "hidden md:flex",
+        "bg-white dark:bg-slate-900 shadow-lg flex-shrink-0 hidden md:flex flex-col transition-all duration-300 z-50 border-l border-gray-100 dark:border-slate-800 print:hidden",
         isSidebarCollapsed ? "md:w-20" : "md:w-72"
       )}>
-        {/* Mobile Menu Header */}
-        <div className="md:hidden p-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800">
-           <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden p-1">
-                <img 
-                  src="https://i.ibb.co/8L8Wx06M/Logo-Saree-1.png" 
-                  alt="Logo" 
-                  className="w-full h-full object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">القائمة</h1>
-           </div>
-           <button 
-             onClick={() => setIsMobileMenuOpen(false)}
-             className="p-2 bg-gray-50 dark:bg-slate-800 rounded-xl text-gray-500 hover:text-red-500 transition-colors"
-           >
-             <X size={24} />
-           </button>
-        </div>
-
         <div className="p-4 hidden md:flex items-center justify-between">
            {!isSidebarCollapsed && (
              <div className="flex items-center gap-2 animate-in fade-in duration-300">
@@ -220,7 +230,6 @@ export default function Layout() {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 group relative",
                   isActive 
@@ -357,7 +366,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <div className="p-4 md:p-10 flex-1">
+        <div className="p-4 md:p-10 flex-1 pb-24 md:pb-10">
         
         <div className="max-w-7xl mx-auto">
           <AnimatePresence mode="wait">
@@ -374,6 +383,29 @@ export default function Layout() {
         </div>
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 z-50 flex overflow-x-auto pb-safe hide-scrollbar print:hidden">
+        {filteredNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                "flex flex-col items-center justify-center min-w-[72px] p-2 gap-1 transition-colors",
+                isActive 
+                  ? "text-indigo-600 dark:text-indigo-400" 
+                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
+              )}
+            >
+              <Icon size={20} className={cn(isActive && "fill-indigo-100 dark:fill-indigo-900/30")} />
+              <span className="text-[10px] font-medium whitespace-nowrap">{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* Change Password Modal */}
       {isChangePasswordOpen && (
