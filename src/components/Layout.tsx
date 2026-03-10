@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
+import NotificationManager from './NotificationManager';
 import { 
   LayoutDashboard, 
   DollarSign, 
@@ -87,6 +88,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col md:flex-row transition-colors duration-300" dir="rtl">
+      <NotificationManager />
       {/* Notifications Toast */}
       <div className="fixed top-4 left-4 z-[100] flex flex-col gap-2 pointer-events-none">
         <AnimatePresence>
