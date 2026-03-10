@@ -1,6 +1,40 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, StateStorage, createJSONStorage } from 'zustand/middleware';
 import { format } from 'date-fns';
+
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+const apiStorage: StateStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`${API_URL}/api/store/${name}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return JSON.stringify(data);
+    } catch (error) {
+      console.error('Failed to get state from API', error);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      await fetch(`${API_URL}/api/store/${name}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: JSON.parse(value) }),
+      });
+    } catch (error) {
+      console.error('Failed to save state to API', error);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      await fetch(`${API_URL}/api/store/${name}`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Failed to delete state from API', error);
+    }
+  },
+};
 
 export const AVAILABLE_PERMISSIONS = [
   { id: 'view_all_branches', name: 'الاطلاع على كافة الفروع' },
@@ -166,11 +200,12 @@ export interface TicketComment {
   text: string;
   date: string;
   authorId: string;
+  image?: string;
 }
 
 export interface TicketHistory {
   id: string;
-  type: 'status_change' | 'comment' | 'creation';
+  type: 'status_change' | 'comment' | 'creation' | 'cost_added' | 'cost_approved';
   date: string;
   authorId: string;
   oldStatus?: Ticket['status'];
@@ -725,6 +760,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'restaurant-system-storage',
+      storage: createJSONStorage(() => apiStorage),
     }
   )
 );

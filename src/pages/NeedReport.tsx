@@ -248,7 +248,7 @@ export default function NeedReport() {
               <h1 className="text-2xl font-bold mb-2">تقرير طلب احتياج</h1>
               <p className="text-gray-600">الفرع: {selectedReport.branchName}</p>
               <p className="text-gray-600">التاريخ: {selectedReport.date}</p>
-              <p className="text-gray-500 text-sm mt-2">تاريخ الطباعة: {format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
+              <p className="text-gray-500 text-sm mt-2">تاريخ الطباعة: {format(new Date(), 'yyyy-MM-dd hh:mm a')}</p>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 print:overflow-visible">

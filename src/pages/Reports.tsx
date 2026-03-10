@@ -128,7 +128,7 @@ export default function Reports() {
           <p><strong>الفروع:</strong> ${branchNames}</p>
           <p><strong>المنتج:</strong> ${productName}</p>
           <p><strong>الفترة:</strong> ${dateRangeStr}</p>
-          <p><strong>تاريخ الاستخراج:</strong> ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
+          <p><strong>تاريخ الاستخراج:</strong> ${format(new Date(), 'yyyy-MM-dd hh:mm a')}</p>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr; gap: 40px;">
@@ -157,7 +157,7 @@ export default function Reports() {
           </button>
           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-gray-100 dark:border-slate-800">
             <Calendar size={16} />
-            <span>آخر تحديث: {format(new Date(), 'yyyy-MM-dd HH:mm')}</span>
+            <span>آخر تحديث: {format(new Date(), 'yyyy-MM-dd hh:mm a')}</span>
           </div>
         </div>
       </div>

@@ -194,11 +194,11 @@ export default function ScheduledReadings() {
                               <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-slate-400">
                                 <span className="flex items-center gap-1">
                                   <Clock size={14} />
-                                  الوقت المجدول: {item.scheduledTime}
+                                  الوقت المجدول: {format(parse(item.scheduledTime, 'HH:mm', new Date()), 'hh:mm a')}
                                 </span>
                                 {isCompleted && (
                                   <span className="text-green-600 font-medium">
-                                    تم التسجيل بواسطة: {record.recordedBy} الساعة {record.time}
+                                    تم التسجيل بواسطة: {record.recordedBy} الساعة {format(parse(record.time, 'HH:mm', new Date()), 'hh:mm a')}
                                   </span>
                                 )}
                               </div>

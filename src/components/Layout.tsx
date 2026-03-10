@@ -128,7 +128,7 @@ export default function Layout() {
       </div>
 
       {/* Mobile Header */}
-      <div className="md:hidden sticky top-0 z-50 bg-white dark:bg-slate-900 shadow-sm p-4 flex justify-between items-center border-b border-gray-100 dark:border-slate-800">
+      <div className="md:hidden sticky top-0 z-50 bg-white dark:bg-slate-900 shadow-sm p-4 flex justify-between items-center border-b border-gray-100 dark:border-slate-800 print:hidden">
         <div className="flex items-center gap-2">
           <img 
             src="https://i.ibb.co/8L8Wx06M/Logo-Saree-1.png" 
@@ -147,7 +147,7 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "bg-white dark:bg-slate-900 shadow-lg flex-shrink-0 md:flex flex-col transition-all duration-300 z-50 border-l border-gray-100 dark:border-slate-800",
+        "bg-white dark:bg-slate-900 shadow-lg flex-shrink-0 md:flex flex-col transition-all duration-300 z-50 border-l border-gray-100 dark:border-slate-800 print:hidden",
         isMobileMenuOpen ? "fixed inset-0 w-full h-full animate-in slide-in-from-right-10 fade-in duration-200" : "hidden md:flex",
         isSidebarCollapsed ? "md:w-20" : "md:w-72"
       )}>
@@ -297,7 +297,7 @@ export default function Layout() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative flex flex-col">
         {/* Desktop Header */}
-        <header className="hidden md:flex items-center justify-between px-10 py-6 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 sticky top-0 z-40">
+        <header className="hidden md:flex items-center justify-between px-10 py-6 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 sticky top-0 z-40 print:hidden">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
               {navItems.find(item => item.path === location.pathname)?.name || 'نظام المتابعة'}

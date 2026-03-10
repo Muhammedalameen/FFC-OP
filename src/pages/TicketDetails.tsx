@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useStore, Ticket } from '../store';
+import { useStore, Ticket, TicketHistory } from '../store';
 import { 
   ArrowRight, 
   Trash2, 
@@ -16,9 +16,13 @@ import {
   CheckCircle2,
   Circle,
   User as UserIcon,
-  Search
+  Search,
+  Printer,
+  Camera,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { compressImage } from '../lib/imageUtils';
 
 export default function TicketDetails() {
   const { id } = useParams();
@@ -38,6 +42,7 @@ export default function TicketDetails() {
   } = useStore();
   
   const [commentText, setCommentText] = useState('');
+  const [commentImage, setCommentImage] = useState<string | null>(null);
   const [costInput, setCostInput] = useState('');
   
   const ticket = tickets.find(t => t.id === id);
@@ -63,25 +68,58 @@ export default function TicketDetails() {
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!commentText.trim() && !commentImage) return;
 
     addTicketComment(ticket.id, {
       text: commentText,
       date: new Date().toISOString(),
-      authorId: currentUser!.id
+      authorId: currentUser!.id,
+      image: commentImage || undefined
     });
     
     setCommentText('');
+    setCommentImage(null);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const compressed = await compressImage(file);
+      setCommentImage(compressed);
+    }
   };
 
   const handleUpdateCost = () => {
     if (!costInput) return;
-    updateTicket(ticket.id, { cost: parseFloat(costInput), isCostApproved: false });
+    const cost = parseFloat(costInput);
+    const newHistoryEvent: TicketHistory = {
+      id: Math.random().toString(36).substring(2, 9),
+      type: 'cost_added',
+      date: new Date().toISOString(),
+      authorId: currentUser!.id,
+      text: `تم إدراج التكلفة التقديرية: ${cost} ر.س`
+    };
+    updateTicket(ticket.id, { 
+      cost, 
+      isCostApproved: false,
+      history: [...(ticket.history || []), newHistoryEvent]
+    });
     setCostInput('');
   };
 
   const handleApproveCost = () => {
-    updateTicket(ticket.id, { isCostApproved: true, costApprovedBy: currentUser!.id });
+    const newHistoryEvent: TicketHistory = {
+      id: Math.random().toString(36).substring(2, 9),
+      type: 'cost_approved',
+      date: new Date().toISOString(),
+      authorId: currentUser!.id,
+      text: `تم اعتماد التكلفة`
+    };
+    updateTicket(ticket.id, { 
+      isCostApproved: true, 
+      costApprovedBy: currentUser!.id,
+      history: [...(ticket.history || []), newHistoryEvent]
+    });
   };
 
   const statusMap = {
@@ -100,7 +138,7 @@ export default function TicketDetails() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12" dir="rtl">
       {/* Navigation & Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between print:hidden">
         <button 
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-gray-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-bold"
@@ -110,6 +148,13 @@ export default function TicketDetails() {
         </button>
         
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => window.print()}
+            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            <Printer size={18} />
+            <span className="hidden sm:inline">طباعة</span>
+          </button>
           {canManage && (
             <select
               value={ticket.status}
@@ -141,11 +186,18 @@ export default function TicketDetails() {
         </div>
       </div>
 
+      {/* Print Header */}
+      <div className="hidden print:block text-center mb-8 pb-8 border-b-2 border-gray-200">
+        <h1 className="text-2xl font-bold mb-2">تقرير طلب صيانة</h1>
+        <p className="text-gray-600">رقم الطلب: #{ticket.id.toUpperCase()}</p>
+        <p className="text-gray-500 text-sm mt-2">تاريخ الطباعة: {format(new Date(), 'yyyy-MM-dd hh:mm a')}</p>
+      </div>
+
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:block">
         
         {/* Left Column: Details & Comments */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-8 print:mb-8">
           
           {/* Header Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-slate-800">
@@ -233,7 +285,7 @@ export default function TicketDetails() {
                         {canApproveCost && (
                           <button 
                             onClick={handleApproveCost}
-                            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
+                            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 transition-colors print:hidden"
                           >
                             اعتماد التكلفة
                           </button>
@@ -242,7 +294,7 @@ export default function TicketDetails() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 print:hidden">
                     <input 
                       type="number" 
                       placeholder="أدخل التكلفة التقديرية" 
@@ -344,12 +396,17 @@ export default function TicketDetails() {
                 return (
                   <div key={comment.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     <div className={`max-w-[85%] rounded-3xl p-5 ${isMe ? 'bg-indigo-600 text-white rounded-tr-sm shadow-lg shadow-indigo-500/20' : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-tl-sm'}`}>
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{comment.text}</p>
+                      {comment.image && (
+                        <a href={comment.image} target="_blank" rel="noreferrer" className="block mb-3 rounded-xl overflow-hidden border border-white/20">
+                          <img src={comment.image} alt="مرفق التعليق" className="max-w-full h-auto max-h-64 object-cover" />
+                        </a>
+                      )}
+                      {comment.text && <p className="text-sm whitespace-pre-wrap leading-relaxed">{comment.text}</p>}
                     </div>
                     <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 mt-2 px-2 flex items-center gap-2">
                       <span>{author?.name}</span>
                       <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full" />
-                      <span>{format(new Date(comment.date), 'yyyy-MM-dd HH:mm')}</span>
+                      <span>{format(new Date(comment.date), 'yyyy-MM-dd hh:mm a')}</span>
                     </div>
                   </div>
                 );
@@ -361,18 +418,48 @@ export default function TicketDetails() {
               )}
             </div>
 
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800">
+            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 print:hidden">
+              {commentImage && (
+                <div className="mb-4 relative inline-block">
+                  <img src={commentImage} alt="معاينة" className="h-24 w-24 object-cover rounded-xl border border-gray-200 dark:border-slate-700" />
+                  <button
+                    type="button"
+                    onClick={() => setCommentImage(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               <form onSubmit={handleAddComment} className="flex gap-3">
-                <input
-                  type="text"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="اكتب تعليقاً للمتابعة..."
-                  className="flex-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl px-6 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="اكتب تعليقاً للمتابعة..."
+                    className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl pl-12 pr-6 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                  />
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="comment-image-upload"
+                    />
+                    <label
+                      htmlFor="comment-image-upload"
+                      className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors flex items-center justify-center rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800"
+                    >
+                      <Camera size={20} />
+                    </label>
+                  </div>
+                </div>
                 <button
                   type="submit"
-                  disabled={!commentText.trim()}
+                  disabled={!commentText.trim() && !commentImage}
                   className="bg-indigo-600 text-white px-8 py-3 rounded-2xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold shadow-lg shadow-indigo-500/20 transition-all"
                 >
                   إرسال
@@ -399,16 +486,20 @@ export default function TicketDetails() {
                     <div className={`absolute right-0 top-1 w-6 h-6 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center z-10 ${
                       event.type === 'creation' ? 'bg-green-500' :
                       event.type === 'status_change' ? 'bg-blue-500' :
+                      event.type === 'cost_approved' ? 'bg-emerald-500' :
+                      event.type === 'cost_added' ? 'bg-amber-500' :
                       'bg-indigo-500'
                     }`}>
                       {event.type === 'creation' && <CheckCircle2 size={12} className="text-white" />}
                       {event.type === 'status_change' && <Clock size={12} className="text-white" />}
                       {event.type === 'comment' && <MessageSquare size={12} className="text-white" />}
+                      {event.type === 'cost_added' && <AlertCircle size={12} className="text-white" />}
+                      {event.type === 'cost_approved' && <CheckCircle2 size={12} className="text-white" />}
                     </div>
                     
                     <div className="space-y-1">
                       <div className="text-xs font-bold text-gray-400 dark:text-slate-500">
-                        {format(new Date(event.date), 'yyyy-MM-dd HH:mm')}
+                        {format(new Date(event.date), 'yyyy-MM-dd hh:mm a')}
                       </div>
                       <div className="text-sm font-bold text-gray-900 dark:text-white">
                         {event.type === 'creation' && 'تم إنشاء الطلب'}
@@ -416,6 +507,8 @@ export default function TicketDetails() {
                           <span>تغيير الحالة إلى <span className="text-indigo-600 dark:text-indigo-400">{statusMap[event.newStatus!].label}</span></span>
                         )}
                         {event.type === 'comment' && 'إضافة تعليق جديد'}
+                        {event.type === 'cost_added' && 'إدراج تكلفة تقديرية'}
+                        {event.type === 'cost_approved' && 'اعتماد التكلفة'}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-slate-400">
                         بواسطة: {author?.name}
