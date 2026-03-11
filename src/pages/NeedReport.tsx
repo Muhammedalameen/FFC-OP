@@ -163,8 +163,10 @@ export default function NeedReport() {
         <div className="flex items-center gap-2">
           <Building2 size={18} className="text-gray-400" />
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
-            <option value="all">كافة الفروع</option>
-            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {canViewAll && <option value="all">كافة الفروع</option>}
+            {branches
+              .filter(b => canViewAll || b.id === currentUser?.branchId)
+              .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
         <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />

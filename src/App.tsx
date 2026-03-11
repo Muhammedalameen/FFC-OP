@@ -17,10 +17,13 @@ import RevenueReports from './pages/RevenueReports';
 import LoadingScreen from './components/LoadingScreen';
 import { useStore } from './store';
 
-// Protected Route Component
+// Protected Route Component (Now optional)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const currentUser = useStore((state) => state.currentUser);
-  if (!currentUser) {
+  // If there are no users in the system, allow access to set up the first user
+  const users = useStore((state) => state.users);
+  
+  if (!currentUser && users.length > 0) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
@@ -33,6 +36,17 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       await checkDbConnection();
+      
+      // Load local session
+      const savedUser = localStorage.getItem('restaurant_session_user');
+      if (savedUser) {
+        try {
+          useStore.setState({ currentUser: JSON.parse(savedUser) });
+        } catch (e) {
+          console.error('Failed to parse local session', e);
+        }
+      }
+
       // Add a small delay to show the nice animation
       setTimeout(() => {
         setIsInitialLoading(false);
@@ -40,6 +54,21 @@ export default function App() {
     };
     init();
   }, [checkDbConnection]);
+
+  // Save session changes to localStorage
+  useEffect(() => {
+    const unsub = useStore.subscribe(
+      (state) => {
+        const currentUser = state.currentUser;
+        if (currentUser) {
+          localStorage.setItem('restaurant_session_user', JSON.stringify(currentUser));
+        } else {
+          localStorage.removeItem('restaurant_session_user');
+        }
+      }
+    );
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const applyTheme = () => {

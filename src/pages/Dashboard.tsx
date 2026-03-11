@@ -23,10 +23,13 @@ export default function Dashboard() {
       navigate('/maintenance', { replace: true });
     } else if (userRole?.permissions.includes('view_inventory_only')) {
       navigate('/need-report', { replace: true });
+    } else if (!canViewAll && currentUser) {
+      // Redirect branch employees to revenue or inventory
+      navigate('/revenue', { replace: true });
     }
-  }, [userRole, navigate]);
+  }, [userRole, navigate, canViewAll, currentUser]);
 
-  if (userRole?.permissions.includes('view_maintenance_only') || userRole?.permissions.includes('view_inventory_only')) {
+  if (userRole?.permissions.includes('view_maintenance_only') || userRole?.permissions.includes('view_inventory_only') || (!canViewAll && currentUser)) {
     return null; // Render nothing while redirecting
   }
 

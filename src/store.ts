@@ -372,9 +372,7 @@ const initialRoles: CustomRole[] = [
   { id: 'r5', name: 'مسؤول مستودع', permissions: ['view_inventory_only', 'view_all_branches', 'view_inventory', 'add_inventory'] },
 ];
 
-const initialUsers: User[] = [
-  { id: '1', employeeId: 'admin', pin: 'admin', name: 'مدير النظام', roleId: 'r1' },
-];
+const initialUsers: User[] = [];
 
 const initialBranches: Branch[] = [];
 
@@ -742,6 +740,11 @@ export const useStore = create<AppState>()(
     {
       name: 'restaurant-system-storage',
       storage: createJSONStorage(() => firebaseStorage),
+      partialize: (state) => {
+        // Exclude session-specific and temporary data from Firestore
+        const { currentUser, notifications, isDbConnected, ...rest } = state;
+        return rest;
+      },
     }
   )
 );

@@ -11,7 +11,8 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { login, isDbConnected, checkDbConnection } = useStore();
+  const { login, isDbConnected, checkDbConnection, users } = useStore();
+  const noUsers = users.length === 0;
   const navigate = useNavigate();
 
   const handleCheckConnection = async () => {
@@ -75,6 +76,34 @@ export default function Login() {
         </div>
         
         <form onSubmit={handleSubmit} className="p-10 space-y-8">
+          {noUsers && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/30 rounded-2xl p-4 overflow-hidden"
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-xl text-blue-600 dark:text-blue-400">
+                  <Database size={20} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-blue-800 dark:text-blue-200 mb-1">النظام جديد</h3>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed mb-3">
+                    لا يوجد مستخدمين في النظام حالياً. يرجى التوجه للوحة الإدارة لإنشاء أول مستخدم.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin')}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors"
+                  >
+                    <ArrowRight size={16} className="rotate-180" />
+                    التوجه للوحة الإدارة
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           <AnimatePresence mode="wait">
             {isDbConnected === false && (
               <motion.div 

@@ -10,17 +10,20 @@ import { printReport } from '../lib/exportUtils';
 import { cn } from '../lib/utils';
 
 export default function Reports() {
-  const { inventoryReports, branches, inventoryItems } = useStore();
+  const { inventoryReports, branches, inventoryItems, currentUser, customRoles } = useStore();
   
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+
   // Applied Filters
   const [appliedProduct, setAppliedProduct] = useState<string>('all');
-  const [appliedBranches, setAppliedBranches] = useState<string[]>(['all']);
+  const [appliedBranches, setAppliedBranches] = useState<string[]>(canViewAll ? ['all'] : [currentUser?.branchId || '']);
   const [appliedDateFilter, setAppliedDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
   const [appliedCustomRange, setAppliedCustomRange] = useState({ start: '', end: '' });
 
   // Temporary State
   const [tempProduct, setTempProduct] = useState<string>('all');
-  const [tempBranches, setTempBranches] = useState<string[]>(['all']);
+  const [tempBranches, setTempBranches] = useState<string[]>(canViewAll ? ['all'] : [currentUser?.branchId || '']);
   const [tempDateFilter, setTempDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
   const [tempCustomRange, setTempCustomRange] = useState({ start: '', end: '' });
 
@@ -213,33 +216,38 @@ export default function Reports() {
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">تصفية حسب الفروع</h3>
             </div>
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
-              <button
-                onClick={() => toggleBranch('all')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
-                  tempBranches.includes('all')
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                    : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                )}
-              >
-                {tempBranches.includes('all') && <Check size={12} />}
-                كافة الفروع
-              </button>
-              {branches.map(branch => (
+              {canViewAll && (
                 <button
-                  key={branch.id}
-                  onClick={() => toggleBranch(branch.id)}
+                  onClick={() => toggleBranch('all')}
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
-                    tempBranches.includes(branch.id)
+                    tempBranches.includes('all')
                       ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
                       : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
                   )}
                 >
-                  {tempBranches.includes(branch.id) && <Check size={12} />}
-                  {branch.name}
+                  {tempBranches.includes('all') && <Check size={12} />}
+                  كافة الفروع
                 </button>
-              ))}
+              )}
+              {branches
+                .filter(b => canViewAll || b.id === currentUser?.branchId)
+                .map(branch => (
+                  <button
+                    key={branch.id}
+                    onClick={() => canViewAll && toggleBranch(branch.id)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
+                      tempBranches.includes(branch.id)
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                        : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700",
+                      !canViewAll && "cursor-default"
+                    )}
+                  >
+                    {tempBranches.includes(branch.id) && <Check size={12} />}
+                    {branch.name}
+                  </button>
+                ))}
             </div>
           </div>
 

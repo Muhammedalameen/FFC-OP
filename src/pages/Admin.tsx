@@ -47,9 +47,11 @@ export default function Admin() {
   const [copySource, setCopySource] = useState('');
   const [copyTarget, setCopyTarget] = useState('');
 
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  if (!userRole?.permissions.includes('manage_system')) {
-    return <div className="p-8 text-center text-red-600">غير مصرح لك بالدخول لهذه الصفحة</div>;
+  const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
+  const canManage = userRole?.permissions.includes('manage_system') || users.length === 0;
+
+  if (!canManage) {
+    return <div className="p-8 text-center text-red-600 font-bold">غير مصرح لك بالدخول لهذه الصفحة</div>;
   }
 
   const handleAddUser = (e: React.FormEvent) => {

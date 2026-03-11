@@ -31,12 +31,13 @@ export default function ScheduledReadings() {
     customRoles
   } = useStore();
 
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+  const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_scheduled');
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedBranchId, setSelectedBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
   const [tempImages, setTempImages] = useState<Record<string, string>>({});
-
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_scheduled');
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -119,11 +120,13 @@ export default function ScheduledReadings() {
               value={selectedBranchId}
               onChange={(e) => setSelectedBranchId(e.target.value)}
               className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
-              disabled={!!currentUser?.branchId && currentUser.roleId !== 'r1'}
+              disabled={!canViewAll}
             >
-              {branches.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
+              {branches
+                .filter(b => canViewAll || b.id === currentUser?.branchId)
+                .map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
             </select>
           </div>
 

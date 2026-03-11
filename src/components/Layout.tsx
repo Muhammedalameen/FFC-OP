@@ -31,7 +31,7 @@ import { format, subDays, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Layout() {
-  const { currentUser, customRoles, logout, theme, setTheme, changeUserPin, revenueReports, inventoryReports, notifications, removeNotification } = useStore();
+  const { currentUser, users, customRoles, logout, theme, setTheme, changeUserPin, revenueReports, inventoryReports, notifications, removeNotification } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -41,12 +41,9 @@ export default function Layout() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  if (!currentUser) {
-    return <Outlet />;
-  }
-
-  const userRole = customRoles.find(r => r.id === currentUser.roleId);
+  const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const permissions = userRole?.permissions || [];
+  const noUsers = users.length === 0;
 
   const handleLogout = () => {
     logout();
@@ -55,6 +52,7 @@ export default function Layout() {
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) return;
     if (newPassword !== confirmPassword) {
       setPasswordError('كلمة المرور غير متطابقة');
       return;
@@ -71,17 +69,17 @@ export default function Layout() {
   };
 
   const navItems = [
-    { name: 'الرئيسية', path: '/', icon: LayoutDashboard, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'الإيرادات اليومية', path: '/revenue', icon: DollarSign, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'جرد المخزون', path: '/inventory', icon: Package, show: !permissions.includes('view_maintenance_only') },
-    { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: !permissions.includes('view_maintenance_only') },
-    { name: 'تقرير الاحتياج', path: '/need-report', icon: AlertCircle, show: !permissions.includes('view_maintenance_only') },
-    { name: 'تقارير التشغيل', path: '/inspection', icon: ClipboardCheck, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'طلبات الصيانة', path: '/maintenance', icon: Wrench, show: !permissions.includes('view_inventory_only') },
-    { name: 'طلبات الشراء', path: '/purchase', icon: ShoppingCart, show: !permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only') },
-    { name: 'لوحة الإدارة', path: '/admin', icon: Settings, show: permissions.includes('manage_system') },
+    { name: 'الرئيسية', path: '/', icon: LayoutDashboard, show: permissions.includes('view_all_branches') || noUsers },
+    { name: 'الإيرادات اليومية', path: '/revenue', icon: DollarSign, show: permissions.includes('view_revenue') || noUsers },
+    { name: 'جرد المخزون', path: '/inventory', icon: Package, show: permissions.includes('view_inventory') || noUsers },
+    { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: permissions.includes('view_scheduled') || noUsers },
+    { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') || noUsers },
+    { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: permissions.includes('manage_system') || noUsers },
+    { name: 'تقرير الاحتياج', path: '/need-report', icon: AlertCircle, show: !permissions.includes('view_maintenance_only') || noUsers },
+    { name: 'تقارير التشغيل', path: '/inspection', icon: ClipboardCheck, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
+    { name: 'طلبات الصيانة', path: '/maintenance', icon: Wrench, show: !permissions.includes('view_inventory_only') || noUsers },
+    { name: 'طلبات الشراء', path: '/purchase', icon: ShoppingCart, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
+    { name: 'لوحة الإدارة', path: '/admin', icon: Settings, show: permissions.includes('manage_system') || noUsers },
   ];
 
   const filteredNavItems = navItems.filter(item => item.show);
@@ -146,17 +144,23 @@ export default function Layout() {
           >
             {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
           </button>
-          <button 
-            onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-            className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold border border-white dark:border-slate-900 shadow-sm"
-          >
-            {currentUser.name.charAt(0)}
-          </button>
+          {currentUser ? (
+            <button 
+              onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+              className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold border border-white dark:border-slate-900 shadow-sm"
+            >
+              {currentUser.name.charAt(0)}
+            </button>
+          ) : (
+            <Link to="/login" className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors">
+              <LogOut size={20} className="rotate-180" />
+            </Link>
+          )}
         </div>
       </div>
 
       {/* Mobile User Dropdown */}
-      {isUserDropdownOpen && (
+      {isUserDropdownOpen && currentUser && (
         <div className="md:hidden fixed top-16 left-4 right-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-2 animate-in slide-in-from-top-2 duration-200 z-50">
           <div className="p-3 border-b border-gray-100 dark:border-slate-800 mb-2">
             <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
@@ -210,17 +214,26 @@ export default function Layout() {
         </div>
 
         <div className={cn("px-4 mb-4 mt-4 md:mt-0", isSidebarCollapsed && "px-2")}>
-           {!isSidebarCollapsed ? (
-             <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 animate-in fade-in">
-               <p className="text-sm font-bold text-gray-900 dark:text-white truncate">مرحباً، {currentUser.name}</p>
-               <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-1 truncate">{userRole?.name}</p>
-             </div>
-           ) : (
-             <div className="flex justify-center">
-               <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
-                 {currentUser.name.charAt(0)}
+           {currentUser ? (
+             !isSidebarCollapsed ? (
+               <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 animate-in fade-in">
+                 <p className="text-sm font-bold text-gray-900 dark:text-white truncate">مرحباً، {currentUser.name}</p>
+                 <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-1 truncate">{userRole?.name}</p>
                </div>
-             </div>
+             ) : (
+               <div className="flex justify-center">
+                 <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
+                   {currentUser.name.charAt(0)}
+                 </div>
+               </div>
+             )
+           ) : (
+             !isSidebarCollapsed && (
+               <Link to="/login" className="flex items-center gap-3 px-4 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all">
+                 <LogOut size={18} className="rotate-180" />
+                 <span>تسجيل الدخول</span>
+               </Link>
+             )
            )}
         </div>
 
@@ -279,29 +292,33 @@ export default function Layout() {
              </button>
           )}
 
-          <button
-            onClick={() => setIsChangePasswordOpen(true)}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 w-full text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-2xl transition-colors font-bold",
-              isSidebarCollapsed && "justify-center px-2"
-            )}
-            title={isSidebarCollapsed ? "تغيير كلمة المرور" : undefined}
-          >
-            <KeyRound size={20} className="flex-shrink-0" />
-            {!isSidebarCollapsed && <span className="whitespace-nowrap">تغيير كلمة المرور</span>}
-          </button>
+          {currentUser && (
+            <button
+              onClick={() => setIsChangePasswordOpen(true)}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 w-full text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-2xl transition-colors font-bold",
+                isSidebarCollapsed && "justify-center px-2"
+              )}
+              title={isSidebarCollapsed ? "تغيير كلمة المرور" : undefined}
+            >
+              <KeyRound size={20} className="flex-shrink-0" />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap">تغيير كلمة المرور</span>}
+            </button>
+          )}
 
-          <button
-            onClick={handleLogout}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl transition-colors font-bold",
-              isSidebarCollapsed && "justify-center px-2"
-            )}
-            title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
-          >
-            <LogOut size={20} className="flex-shrink-0" />
-            {!isSidebarCollapsed && <span className="whitespace-nowrap">تسجيل الخروج</span>}
-          </button>
+          {currentUser && (
+            <button
+              onClick={handleLogout}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl transition-colors font-bold",
+                isSidebarCollapsed && "justify-center px-2"
+              )}
+              title={isSidebarCollapsed ? "تسجيل الخروج" : undefined}
+            >
+              <LogOut size={20} className="flex-shrink-0" />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap">تسجيل الخروج</span>}
+            </button>
+          )}
         </div>
       </aside>
 
