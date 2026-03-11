@@ -37,17 +37,6 @@ export default function App() {
     const init = async () => {
       await checkDbConnection();
       
-      // Load local session
-      const rememberMe = localStorage.getItem('restaurant_remember_me') === 'true';
-      const savedUser = localStorage.getItem('restaurant_session_user');
-      if (rememberMe && savedUser) {
-        try {
-          useStore.setState({ currentUser: JSON.parse(savedUser) });
-        } catch (e) {
-          console.error('Failed to parse local session', e);
-        }
-      }
-
       // Add a small delay to show the nice animation
       setTimeout(() => {
         setIsInitialLoading(false);
@@ -55,24 +44,6 @@ export default function App() {
     };
     init();
   }, [checkDbConnection]);
-
-  // Save session changes to localStorage
-  useEffect(() => {
-    const unsub = useStore.subscribe(
-      (state) => {
-        const currentUser = state.currentUser;
-        const rememberMe = localStorage.getItem('restaurant_remember_me') === 'true';
-        
-        if (currentUser && rememberMe) {
-          localStorage.setItem('restaurant_session_user', JSON.stringify(currentUser));
-        } else if (!currentUser) {
-          localStorage.removeItem('restaurant_session_user');
-          localStorage.removeItem('restaurant_remember_me');
-        }
-      }
-    );
-    return unsub;
-  }, []);
 
   useEffect(() => {
     const applyTheme = () => {

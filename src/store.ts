@@ -265,7 +265,7 @@ interface AppState {
   
   // Actions
   checkDbConnection: () => Promise<void>;
-  login: (employeeId: string, pin: string) => boolean;
+  login: (employeeId: string, pin: string, rememberMe?: boolean) => boolean;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info', duration?: number, undoAction?: () => void) => void;
@@ -396,7 +396,18 @@ export const useStore = create<AppState>()(
       scheduledReadingItems: initialScheduledReadingItems,
       readingRecords: [],
       tickets: [],
-      currentUser: null,
+      currentUser: (() => {
+        try {
+          const rememberMe = localStorage.getItem('restaurant_remember_me') === 'true';
+          const savedUser = localStorage.getItem('restaurant_session_user');
+          if (rememberMe && savedUser) {
+            return JSON.parse(savedUser);
+          }
+        } catch (e) {
+          console.error('Failed to load session', e);
+        }
+        return null;
+      })(),
       theme: 'system',
       notifications: [],
       isDbConnected: null,
@@ -413,15 +424,26 @@ export const useStore = create<AppState>()(
         }
       },
 
-      login: (employeeId, pin) => {
+      login: (employeeId, pin, rememberMe) => {
         const user = get().users.find(u => u.employeeId === employeeId && u.pin === pin);
         if (user) {
           set({ currentUser: user });
+          if (rememberMe) {
+            localStorage.setItem('restaurant_remember_me', 'true');
+            localStorage.setItem('restaurant_session_user', JSON.stringify(user));
+          } else {
+            localStorage.removeItem('restaurant_remember_me');
+            localStorage.removeItem('restaurant_session_user');
+          }
           return true;
         }
         return false;
       },
-      logout: () => set({ currentUser: null }),
+      logout: () => {
+        set({ currentUser: null });
+        localStorage.removeItem('restaurant_remember_me');
+        localStorage.removeItem('restaurant_session_user');
+      },
       setTheme: (theme) => set({ theme }),
       addNotification: (message, type, duration = 3000, undoAction) => {
         const id = generateId();

@@ -30,13 +30,8 @@ export default function Login() {
     
     // Simulate network delay for the loading screen
     setTimeout(() => {
-      const success = login(employeeId, pin);
+      const success = login(employeeId, pin, rememberMe);
       if (success) {
-        if (rememberMe) {
-          localStorage.setItem('restaurant_remember_me', 'true');
-        } else {
-          localStorage.removeItem('restaurant_remember_me');
-        }
         navigate('/');
       } else {
         setError('الرقم الوظيفي أو كود الدخول غير صحيح');
