@@ -374,51 +374,15 @@ const initialRoles: CustomRole[] = [
 
 const initialUsers: User[] = [
   { id: '1', employeeId: 'admin', pin: 'admin', name: 'مدير النظام', roleId: 'r1' },
-  { id: '2', employeeId: '1001', pin: '1234', name: 'أحمد (مدير منطقة)', roleId: 'r2' },
-  { id: '3', employeeId: '2001', pin: '1234', name: 'محمد (فرع الرياض)', roleId: 'r3', branchId: 'b1' },
 ];
 
-const initialBranches: Branch[] = [
-  { id: 'b1', name: 'فرع الرياض - العليا' },
-  { id: 'b2', name: 'فرع الرياض - النخيل' },
-  { id: 'b3', name: 'فرع جدة - التحلية' },
-  { id: 'b4', name: 'فرع الدمام - الكورنيش' },
-];
+const initialBranches: Branch[] = [];
 
-const initialInventoryItems: InventoryItem[] = [
-  { id: 'i1', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'دجاج طازج', unit: 'كجم', category: 'بروتين' },
-  { id: 'i2', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'أرز بسمتي', unit: 'كجم', category: 'مواد جافة' },
-  { id: 'i3', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'زيت قلي', unit: 'لتر', category: 'زيوت' },
-  { id: 'i4', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'بطاطس مقلية', unit: 'كجم', category: 'مجمدات' },
-  { id: 'i5', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'خبز برجر', unit: 'حبة', category: 'مخبوزات' },
-  { id: 'i6', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'خس', unit: 'كجم', category: 'خضروات' },
-  { id: 'i7', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'طماطم', unit: 'كجم', category: 'خضروات' },
-  { id: 'i8', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'مايونيز', unit: 'جالون', category: 'صوصات' },
-  { id: 'i9', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'كاتشب', unit: 'جالون', category: 'صوصات' },
-  { id: 'i10', branchIds: ['b1', 'b2', 'b3', 'b4'], name: 'أكواب ورقية', unit: 'شدة', category: 'تغليف' },
-];
+const initialInventoryItems: InventoryItem[] = [];
 
-const initialOperationalItems: OperationalItem[] = [
-  { id: 'o1', name: 'نظافة الصالة والطاولات', category: 'النظافة' },
-  { id: 'o2', name: 'نظافة الحمامات', category: 'النظافة' },
-  { id: 'o3', name: 'نظافة المطبخ والأرضيات', category: 'النظافة' },
-  { id: 'o4', name: 'تواريخ صلاحية اللحوم والدواجن', category: 'المخزون' },
-  { id: 'o5', name: 'تواريخ صلاحية الخضروات', category: 'المخزون' },
-  { id: 'o6', name: 'درجة حرارة الثلاجات (0-5)', category: 'المعدات' },
-  { id: 'o7', name: 'درجة حرارة الفريزر (-18)', category: 'المعدات' },
-  { id: 'o8', name: 'عمل ماكينة الكاشير والشبكة', category: 'المعدات' },
-  { id: 'o9', name: 'التزام الموظفين بالزي الرسمي', category: 'الموظفين' },
-  { id: 'o10', name: 'سرعة تقديم الطلبات', category: 'الجودة' },
-];
+const initialOperationalItems: OperationalItem[] = [];
 
-const initialScheduledReadingItems: ScheduledReadingItem[] = [
-  { id: 'sr1', name: 'درجة حرارة ثلاجة اللحوم', unit: '°C', type: 'number', scheduledTime: '09:00', category: 'المعدات' },
-  { id: 'sr2', name: 'درجة حرارة ثلاجة اللحوم', unit: '°C', type: 'number', scheduledTime: '15:00', category: 'المعدات' },
-  { id: 'sr3', name: 'درجة حرارة ثلاجة اللحوم', unit: '°C', type: 'number', scheduledTime: '21:00', category: 'المعدات' },
-  { id: 'sr4', name: 'فحص نظافة منطقة التحضير', type: 'boolean', scheduledTime: '10:00', category: 'النظافة' },
-  { id: 'sr5', name: 'فحص نظافة منطقة التحضير', type: 'boolean', scheduledTime: '16:00', category: 'النظافة' },
-  { id: 'sr6', name: 'فحص نظافة منطقة التحضير', type: 'boolean', scheduledTime: '22:00', category: 'النظافة' },
-];
+const initialScheduledReadingItems: ScheduledReadingItem[] = [];
 
 export const useStore = create<AppState>()(
   persist(
