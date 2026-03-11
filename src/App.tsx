@@ -38,8 +38,9 @@ export default function App() {
       await checkDbConnection();
       
       // Load local session
+      const rememberMe = localStorage.getItem('restaurant_remember_me') === 'true';
       const savedUser = localStorage.getItem('restaurant_session_user');
-      if (savedUser) {
+      if (rememberMe && savedUser) {
         try {
           useStore.setState({ currentUser: JSON.parse(savedUser) });
         } catch (e) {
@@ -60,10 +61,13 @@ export default function App() {
     const unsub = useStore.subscribe(
       (state) => {
         const currentUser = state.currentUser;
-        if (currentUser) {
+        const rememberMe = localStorage.getItem('restaurant_remember_me') === 'true';
+        
+        if (currentUser && rememberMe) {
           localStorage.setItem('restaurant_session_user', JSON.stringify(currentUser));
-        } else {
+        } else if (!currentUser) {
           localStorage.removeItem('restaurant_session_user');
+          localStorage.removeItem('restaurant_remember_me');
         }
       }
     );
