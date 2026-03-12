@@ -24,7 +24,8 @@ import {
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
-  Info
+  Info,
+  Download
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, subDays, parseISO } from 'date-fns';
@@ -40,6 +41,36 @@ export default function Layout() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    setDeferredPrompt(null);
+    setIsInstallable(false);
+  };
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const permissions = userRole?.permissions || [];
@@ -138,6 +169,16 @@ export default function Layout() {
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">نظام المتابعة</h1>
         </div>
         <div className="flex items-center gap-3">
+          {isInstallable && (
+            <button
+              onClick={handleInstallClick}
+              className="p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors flex items-center gap-1"
+              title="تثبيت التطبيق"
+            >
+              <Download size={18} />
+              <span className="text-xs font-bold hidden sm:inline">تثبيت</span>
+            </button>
+          )}
           <button 
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -336,6 +377,15 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-4">
+            {isInstallable && (
+              <button
+                onClick={handleInstallClick}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors font-bold text-sm"
+              >
+                <Download size={18} />
+                تثبيت التطبيق
+              </button>
+            )}
             <button className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors relative">
               <Bell size={20} />
               {notifications.length > 0 && (
