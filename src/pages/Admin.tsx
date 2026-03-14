@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem } from '../store';
-import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload } from 'lucide-react';
+import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Cars from './admin/Cars';
 
 export default function Admin() {
   const { 
@@ -14,7 +15,7 @@ export default function Admin() {
     scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled' | 'cars'>('users');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +238,7 @@ export default function Admin() {
     { id: 'operational', name: 'بنود التشغيل', icon: ClipboardList },
     { id: 'scheduled', name: 'القراءات المجدولة', icon: Clock },
     { id: 'inventory', name: 'أصناف المخزون', icon: Package },
+    { id: 'cars', name: 'السيارات', icon: Car },
   ] as const;
 
   return (
@@ -811,6 +813,10 @@ export default function Admin() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'cars' && (
+          <Cars />
         )}
       </div>
     </div>

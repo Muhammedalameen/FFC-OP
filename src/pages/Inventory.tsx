@@ -37,18 +37,19 @@ export default function Inventory() {
     return totalCons / relevantReports.length;
   };
 
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const permissions = userRole?.permissions || [];
+  const canViewAll = permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+  const canAdd = (permissions.includes('add_reports') || permissions.includes('add_inventory')) && !permissions.includes('view_inventory_only');
+  const canDelete = (permissions.includes('delete_reports') || permissions.includes('delete_inventory')) && !permissions.includes('view_inventory_only');
+
   // Filter State
   const [filterDate, setFilterDate] = useState({
     start: format(new Date(), 'yyyy-MM-01'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
-  const [filterBranch, setFilterBranch] = useState('all');
-
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const permissions = userRole?.permissions || [];
-  const canViewAll = permissions.includes('view_all_branches') || permissions.includes('view_inventory_only') || permissions.includes('view_inventory');
-  const canAdd = (permissions.includes('add_reports') || permissions.includes('add_inventory')) && !permissions.includes('view_inventory_only');
-  const canDelete = (permissions.includes('delete_reports') || permissions.includes('delete_inventory')) && !permissions.includes('view_inventory_only');
+  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   // Load items for the selected branch or when editing
   useEffect(() => {
@@ -361,9 +362,7 @@ export default function Inventory() {
           <Building2 size={18} className="text-gray-400" />
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
             {canViewAll && <option value="all">كافة الفروع</option>}
-            {branches
-              .filter(b => canViewAll || b.id === currentUser?.branchId)
-              .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
       </div>
@@ -402,7 +401,7 @@ export default function Inventory() {
                       disabled={!!editingReportId}
                     >
                       <option value="">اختر الفرع</option>
-                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                 )}

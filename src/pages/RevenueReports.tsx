@@ -12,15 +12,19 @@ import { cn } from '../lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function RevenueReports() {
-  const { revenueReports, branches } = useStore();
+  const { revenueReports, branches, currentUser, customRoles } = useStore();
   
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+
   // Applied Filters (Used for calculation)
-  const [appliedBranches, setAppliedBranches] = useState<string[]>(['all']);
+  const [appliedBranches, setAppliedBranches] = useState<string[]>(canViewAll ? ['all'] : [currentUser?.branchId || '']);
   const [appliedDateFilter, setAppliedDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
   const [appliedCustomRange, setAppliedCustomRange] = useState({ start: '', end: '' });
 
   // Temporary State (For UI controls)
-  const [tempBranches, setTempBranches] = useState<string[]>(['all']);
+  const [tempBranches, setTempBranches] = useState<string[]>(canViewAll ? ['all'] : [currentUser?.branchId || '']);
   const [tempDateFilter, setTempDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
   const [tempCustomRange, setTempCustomRange] = useState({ start: '', end: '' });
 
@@ -61,8 +65,9 @@ export default function RevenueReports() {
     const filteredRevenue = revenueReports.filter(r => {
       const date = parseISO(r.date);
       const inRange = isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
-      const inBranch = appliedBranches.includes('all') || appliedBranches.includes(r.branchId);
-      return inRange && inBranch;
+      const inBranch = appliedBranches.includes('all') ? (canViewAll ? true : r.branchId === currentUser?.branchId) : appliedBranches.includes(r.branchId);
+      const permissionMatch = canViewAll ? true : r.branchId === currentUser?.branchId;
+      return inRange && inBranch && permissionMatch;
     });
 
     // Revenue Calculations
@@ -224,19 +229,21 @@ export default function RevenueReports() {
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">تصفية حسب الفروع</h3>
             </div>
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
-              <button
-                onClick={() => toggleBranch('all')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
-                  tempBranches.includes('all')
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                    : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                )}
-              >
-                {tempBranches.includes('all') && <Check size={12} />}
-                كافة الفروع
-              </button>
-              {branches.map(branch => (
+              {canViewAll && (
+                <button
+                  onClick={() => toggleBranch('all')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
+                    tempBranches.includes('all')
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                      : "bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  )}
+                >
+                  {tempBranches.includes('all') && <Check size={12} />}
+                  كافة الفروع
+                </button>
+              )}
+              {userBranches.map(branch => (
                 <button
                   key={branch.id}
                   onClick={() => toggleBranch(branch.id)}

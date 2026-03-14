@@ -14,6 +14,9 @@ import Admin from './pages/Admin';
 import Reports from './pages/Reports';
 import ScheduledReadings from './pages/ScheduledReadings';
 import RevenueReports from './pages/RevenueReports';
+import CarHandovers from './pages/CarHandovers';
+import NewCarHandover from './pages/NewCarHandover';
+import ReturnCarHandover from './pages/ReturnCarHandover';
 import LoadingScreen from './components/LoadingScreen';
 import { useStore } from './store';
 
@@ -88,6 +91,9 @@ export default function App() {
               <Route path="maintenance" element={<Tickets type="maintenance" />} />
               <Route path="purchase" element={<Tickets type="purchase" />} />
               <Route path="ticket/:id" element={<TicketDetails />} />
+              <Route path="car-handovers" element={<CarHandovers />} />
+              <Route path="car-handovers/new" element={<NewCarHandover />} />
+              <Route path="car-handovers/return/:id" element={<ReturnCarHandover />} />
               <Route path="admin/*" element={<Admin />} />
             </Route>
           </Routes>

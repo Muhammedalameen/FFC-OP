@@ -7,17 +7,18 @@ import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
 export default function NeedReport() {
   const { currentUser, customRoles, branches, inventoryItems, inventoryReports } = useStore();
 
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+
   // Filter State
   const [filterDate, setFilterDate] = useState({
     start: format(new Date(), 'yyyy-MM-01'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
-  const [filterBranch, setFilterBranch] = useState('all');
+  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
-
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const canViewAll = userRole?.permissions.includes('view_all_branches');
 
   // 1. Filter Reports
   const filteredReports = inventoryReports.filter(r => {
@@ -76,7 +77,7 @@ export default function NeedReport() {
       item.unit,
       item.need.toString()
     ]));
-    exportToPDF(headers, data, `تقرير_الاحتياج_${format(new Date(), 'yyyy-MM-dd')}`, 'تقرير احتياج المواد');
+    exportToPDF(headers, data, `طلبات_التوريد_${format(new Date(), 'yyyy-MM-dd')}`, 'طلبات التوريد');
   };
 
   const handlePrintNeedReport = (report: any) => {
@@ -90,7 +91,7 @@ export default function NeedReport() {
 
     const content = `
       <div dir="rtl" style="font-family: sans-serif; padding: 20px;">
-        <h1 style="text-align: center; color: #4f46e5;">تقرير الاحتياج (طلب بضاعة)</h1>
+        <h1 style="text-align: center; color: #4f46e5;">طلبات التوريد (طلب بضاعة)</h1>
         <div style="display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
           <div>
             <p><strong>الفرع:</strong> ${branch?.name}</p>
@@ -139,7 +140,7 @@ export default function NeedReport() {
   return (
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">تقرير الاحتياج (حسب الطلبات)</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">طلبات التوريد</h1>
         <div className="flex items-center gap-2">
           <div className="flex bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-1 shadow-sm">
             <button onClick={handleExportXLSX} className="p-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg transition-colors" title="تصدير Excel">
@@ -164,9 +165,7 @@ export default function NeedReport() {
           <Building2 size={18} className="text-gray-400" />
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
             {canViewAll && <option value="all">كافة الفروع</option>}
-            {branches
-              .filter(b => canViewAll || b.id === currentUser?.branchId)
-              .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
         <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />

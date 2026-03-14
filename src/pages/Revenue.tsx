@@ -19,12 +19,16 @@ export default function Revenue() {
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
   const [shifts, setShifts] = useState<Omit<ShiftRevenue, 'id'>[]>([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
 
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+
   // Filter State
   const [filterDate, setFilterDate] = useState({
     start: format(new Date(), 'yyyy-MM-01'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
-  const [filterBranch, setFilterBranch] = useState('all');
+  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   // Load report data when editing
   useEffect(() => {
@@ -96,8 +100,6 @@ export default function Revenue() {
     setIsAdding(true);
   };
 
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const canViewAll = userRole?.permissions.includes('view_all_branches');
   const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_revenue');
   const canDelete = userRole?.permissions.includes('delete_reports') || userRole?.permissions.includes('delete_revenue');
 
@@ -256,9 +258,7 @@ export default function Revenue() {
           <Building2 size={18} className="text-gray-400" />
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
             {canViewAll && <option value="all">كافة الفروع</option>}
-            {branches
-              .filter(b => canViewAll || b.id === currentUser?.branchId)
-              .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
       </div>
@@ -297,7 +297,7 @@ export default function Revenue() {
                       disabled={!!editingReportId}
                     >
                       <option value="">اختر الفرع</option>
-                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                 )}

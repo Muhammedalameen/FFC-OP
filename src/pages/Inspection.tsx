@@ -13,17 +13,18 @@ export default function Inspection() {
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
   const [items, setItems] = useState<InspectionReportItem[]>([]);
 
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+  const canAdd = userRole?.permissions.includes('add_reports');
+  const canDelete = userRole?.permissions.includes('delete_reports');
+
   // Filter State
   const [filterDate, setFilterDate] = useState({
     start: format(new Date(), 'yyyy-MM-01'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
-  const [filterBranch, setFilterBranch] = useState('all');
-
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const canViewAll = userRole?.permissions.includes('view_all_branches');
-  const canAdd = userRole?.permissions.includes('add_reports');
-  const canDelete = userRole?.permissions.includes('delete_reports');
+  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   useEffect(() => {
     if (isAdding) {
@@ -136,9 +137,7 @@ export default function Inspection() {
           <Building2 size={18} className="text-gray-400" />
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
             {canViewAll && <option value="all">كافة الفروع</option>}
-            {branches
-              .filter(b => canViewAll || b.id === currentUser?.branchId)
-              .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
       </div>
@@ -174,7 +173,7 @@ export default function Inspection() {
                       required
                     >
                       <option value="">اختر الفرع</option>
-                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                 )}

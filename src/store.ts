@@ -71,6 +71,12 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'edit_purchase', name: 'تعديل طلب شراء' },
   { id: 'delete_purchase', name: 'حذف طلب شراء' },
 
+  // Car Handovers Permissions
+  { id: 'view_cars', name: 'عرض السيارات' },
+  { id: 'manage_cars', name: 'إدارة السيارات' },
+  { id: 'view_car_handovers', name: 'عرض عمليات استلام السيارات' },
+  { id: 'add_car_handovers', name: 'إضافة عملية استلام سيارة' },
+
   // Legacy/Other
   { id: 'add_reports', name: 'إضافة التقارير والطلبات (عام)' },
   { id: 'delete_reports', name: 'حذف التقارير (عام)' },
@@ -98,6 +104,43 @@ export interface User {
 export interface Branch {
   id: string;
   name: string;
+}
+
+export interface Car {
+  id: string;
+  name: string;
+  model: string;
+  plateNumber: string;
+}
+
+export interface CarHandover {
+  id: string;
+  referenceNumber: string;
+  carId: string;
+  date: string;
+  driverId: string;
+  odometerReading: number;
+  fuelLevel: number;
+  odometerImage: string;
+  rightSideImage: string;
+  leftSideImage: string;
+  backImage: string;
+  frontImage: string;
+  reason: string;
+  expectedReturnDate?: string;
+  createdAt: string;
+  status: 'open' | 'closed';
+  returnDate?: string;
+  returnOdometerReading?: number;
+  returnFuelLevel?: number;
+  returnOdometerImage?: string;
+  returnRightSideImage?: string;
+  returnLeftSideImage?: string;
+  returnBackImage?: string;
+  returnFrontImage?: string;
+  returnReason?: string;
+  notes?: string;
+  returnNotes?: string;
 }
 
 export interface InventoryItem {
@@ -258,6 +301,8 @@ interface AppState {
   scheduledReadingItems: ScheduledReadingItem[];
   readingRecords: ReadingRecord[];
   tickets: Ticket[];
+  cars: Car[];
+  carHandovers: CarHandover[];
   currentUser: User | null;
   theme: 'light' | 'dark' | 'system';
   notifications: Notification[];
@@ -283,6 +328,10 @@ interface AppState {
   addBranch: (branch: Omit<Branch, 'id'>) => void;
   updateBranch: (id: string, branch: Partial<Branch>) => void;
   deleteBranch: (id: string) => void;
+
+  addCar: (car: Omit<Car, 'id'>) => void;
+  updateCar: (id: string, car: Partial<Car>) => void;
+  deleteCar: (id: string) => void;
   
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
@@ -325,6 +374,10 @@ interface AppState {
   addTicketComment: (ticketId: string, comment: Omit<TicketComment, 'id'>) => void;
   deleteTicket: (id: string) => void;
   restoreTicket: (ticket: Ticket) => void;
+
+  addCarHandover: (handover: Omit<CarHandover, 'id' | 'referenceNumber' | 'createdAt' | 'status'>) => void;
+  returnCarHandover: (id: string, returnData: Partial<CarHandover>) => void;
+  deleteCarHandover: (id: string) => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -345,7 +398,8 @@ const initialRoles: CustomRole[] = [
       'view_inventory', 'add_inventory', 'edit_inventory', 'delete_inventory',
       'view_scheduled', 'add_scheduled', 'edit_scheduled', 'delete_scheduled',
       'view_maintenance', 'add_maintenance', 'edit_maintenance', 'delete_maintenance', 'approve_maintenance_cost',
-      'view_purchase', 'add_purchase', 'edit_purchase', 'delete_purchase'
+      'view_purchase', 'add_purchase', 'edit_purchase', 'delete_purchase',
+      'view_cars', 'manage_cars', 'view_car_handovers', 'add_car_handovers'
     ] 
   },
   { 
@@ -353,7 +407,8 @@ const initialRoles: CustomRole[] = [
     name: 'مدير منطقة', 
     permissions: [
       'view_all_branches', 'approve_reports', 'approve_maintenance_cost',
-      'view_revenue', 'view_inventory', 'view_scheduled', 'view_maintenance', 'view_purchase'
+      'view_revenue', 'view_inventory', 'view_scheduled', 'view_maintenance', 'view_purchase',
+      'view_cars', 'view_car_handovers'
     ] 
   },
   { 
@@ -365,11 +420,13 @@ const initialRoles: CustomRole[] = [
       'view_inventory', 'add_inventory',
       'view_scheduled', 'add_scheduled',
       'view_maintenance', 'add_maintenance',
-      'view_purchase', 'add_purchase'
+      'view_purchase', 'add_purchase',
+      'view_cars', 'view_car_handovers'
     ] 
   },
   { id: 'r4', name: 'مسؤول صيانة', permissions: ['view_maintenance_only', 'view_maintenance', 'add_maintenance', 'edit_maintenance'] },
   { id: 'r5', name: 'مسؤول مستودع', permissions: ['view_inventory_only', 'view_all_branches', 'view_inventory', 'add_inventory'] },
+  { id: 'r6', name: 'سائق', permissions: ['view_cars', 'view_car_handovers', 'add_car_handovers'] },
 ];
 
 const initialUsers: User[] = [];
@@ -396,6 +453,8 @@ export const useStore = create<AppState>()(
       scheduledReadingItems: initialScheduledReadingItems,
       readingRecords: [],
       tickets: [],
+      cars: [],
+      carHandovers: [],
       currentUser: (() => {
         try {
           const rememberMe = localStorage.getItem('restaurant_remember_me') === 'true';
@@ -491,6 +550,19 @@ export const useStore = create<AppState>()(
       deleteBranch: (id) => {
         set((state) => ({ branches: state.branches.filter(b => b.id !== id) }));
         get().addNotification('تم حذف الفرع', 'success');
+      },
+
+      addCar: (car) => {
+        set((state) => ({ cars: [...state.cars, { ...car, id: generateId() }] }));
+        get().addNotification('تم إضافة السيارة بنجاح', 'success');
+      },
+      updateCar: (id, car) => {
+        set((state) => ({ cars: state.cars.map(c => c.id === id ? { ...c, ...car } : c) }));
+        get().addNotification('تم تحديث بيانات السيارة', 'success');
+      },
+      deleteCar: (id) => {
+        set((state) => ({ cars: state.cars.filter(c => c.id !== id) }));
+        get().addNotification('تم حذف السيارة', 'success');
       },
 
       addInventoryItem: (item) => {
@@ -757,6 +829,35 @@ export const useStore = create<AppState>()(
       restoreTicket: (ticket) => {
         set((state) => ({ tickets: [...state.tickets, ticket] }));
         get().addNotification('تم استعادة الطلب', 'success');
+      },
+
+      addCarHandover: (handover) => {
+        set((state) => {
+          const count = state.carHandovers.filter(h => h.date === handover.date).length;
+          const referenceNumber = generateReferenceNumber(handover.date, count);
+          return {
+            carHandovers: [...state.carHandovers, {
+              ...handover,
+              id: generateId(),
+              createdAt: format(new Date(), "yyyy-MM-dd'T'HH:mm:ssXXX"),
+              referenceNumber,
+              status: 'open'
+            }]
+          };
+        });
+        get().addNotification('تم تسجيل استلام السيارة بنجاح', 'success');
+      },
+      returnCarHandover: (id, returnData) => {
+        set((state) => ({
+          carHandovers: state.carHandovers.map(h => 
+            h.id === id ? { ...h, ...returnData, status: 'closed' } : h
+          )
+        }));
+        get().addNotification('تم تسجيل تسليم السيارة بنجاح', 'success');
+      },
+      deleteCarHandover: (id) => {
+        set((state) => ({ carHandovers: state.carHandovers.filter(h => h.id !== id) }));
+        get().addNotification('تم حذف سجل استلام السيارة', 'success');
       },
     }),
     {

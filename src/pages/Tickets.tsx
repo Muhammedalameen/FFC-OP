@@ -31,12 +31,20 @@ export default function Tickets({ type }: TicketsProps) {
   const [newItemUnit, setNewItemUnit] = useState('');
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
 
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const permissions = userRole?.permissions || [];
+  const permissionType = type === 'maintenance' ? 'maintenance' : 'purchase';
+  const canViewAll = permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+  const canAdd = (permissions.includes('add_reports') || permissions.includes(`add_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
+  const canDelete = (permissions.includes('delete_reports') || permissions.includes(`delete_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
+
   // Filter State
   const [filterDate, setFilterDate] = useState({
     start: format(new Date(), 'yyyy-MM-01'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
-  const [filterBranch, setFilterBranch] = useState('all');
+  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
   const [searchTerm, setSearchTerm] = useState('');
 
   const titleText = type === 'maintenance' ? 'طلبات الصيانة' : 'طلبات الشراء';
@@ -84,14 +92,6 @@ export default function Tickets({ type }: TicketsProps) {
     setEstimatedCost(0);
   };
 
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const permissions = userRole?.permissions || [];
-  
-  const permissionType = type === 'maintenance' ? 'maintenance' : 'purchase';
-  const canViewAll = permissions.includes('view_all_branches') || permissions.includes(`view_${permissionType}_only`) || permissions.includes(`view_${permissionType}`);
-  const canAdd = (permissions.includes('add_reports') || permissions.includes(`add_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
-  const canDelete = (permissions.includes('delete_reports') || permissions.includes(`delete_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
-
   const filteredTickets = tickets.filter(t => {
     if (t.type !== type) return false;
     
@@ -134,9 +134,7 @@ export default function Tickets({ type }: TicketsProps) {
           <Building2 size={18} className="text-gray-400" />
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
             {canViewAll && <option value="all">كافة الفروع</option>}
-            {branches
-              .filter(b => canViewAll || b.id === currentUser?.branchId)
-              .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
         <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />
@@ -177,7 +175,7 @@ export default function Tickets({ type }: TicketsProps) {
                     required
                   >
                     <option value="">اختر الفرع</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               )}

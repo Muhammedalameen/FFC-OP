@@ -25,7 +25,8 @@ import {
   ChevronLeft,
   CheckCircle2,
   Info,
-  Download
+  Download,
+  Car
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, subDays, parseISO } from 'date-fns';
@@ -104,9 +105,10 @@ export default function Layout() {
     { name: 'الإيرادات اليومية', path: '/revenue', icon: DollarSign, show: permissions.includes('view_revenue') || noUsers },
     { name: 'جرد المخزون', path: '/inventory', icon: Package, show: permissions.includes('view_inventory') || noUsers },
     { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: permissions.includes('view_scheduled') || noUsers },
+    { name: 'استلام السيارات', path: '/car-handovers', icon: Car, show: permissions.includes('view_car_handovers') || noUsers },
     { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') || noUsers },
     { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: permissions.includes('manage_system') || noUsers },
-    { name: 'تقرير الاحتياج', path: '/need-report', icon: AlertCircle, show: !permissions.includes('view_maintenance_only') || noUsers },
+    { name: 'طلبات التوريد', path: '/need-report', icon: AlertCircle, show: !permissions.includes('view_maintenance_only') || noUsers },
     { name: 'تقارير التشغيل', path: '/inspection', icon: ClipboardCheck, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
     { name: 'طلبات الصيانة', path: '/maintenance', icon: Wrench, show: !permissions.includes('view_inventory_only') || noUsers },
     { name: 'طلبات الشراء', path: '/purchase', icon: ShoppingCart, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
