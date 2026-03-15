@@ -329,7 +329,7 @@ export default function Admin() {
                         </td>
                         <td className="px-4 py-3 text-sm flex gap-2">
                           <button onClick={() => handleEditUser(user)} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">تعديل</button>
-                          {user.id !== currentUser.id && (
+                          {user.id !== currentUser?.id && (
                             <button onClick={() => deleteUser(user.id)} className="text-red-500 hover:text-red-700">
                               <Trash2 size={18} />
                             </button>

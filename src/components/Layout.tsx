@@ -398,40 +398,49 @@ export default function Layout() {
             <div className="h-8 w-px bg-gray-100 dark:bg-slate-800" />
 
             <div className="relative">
-              <button 
-                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors"
-              >
-                <div className="text-left hidden lg:block">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
-                  <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
-                </div>
-                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold border-2 border-white dark:border-slate-900 shadow-sm">
-                  {currentUser.name.charAt(0)}
-                </div>
-              </button>
-              
-              {isUserDropdownOpen && (
-                <div className="absolute left-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-2 animate-in zoom-in-95 duration-200 z-50">
-                  <div className="p-2 border-b border-gray-100 dark:border-slate-800 mb-2 lg:hidden">
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
-                  </div>
-                  <button
-                    onClick={() => { setIsChangePasswordOpen(true); setIsUserDropdownOpen(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
+              {currentUser ? (
+                <>
+                  <button 
+                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                    className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors"
                   >
-                    <KeyRound size={18} />
-                    تغيير كلمة المرور
+                    <div className="text-left hidden lg:block">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
+                    </div>
+                    <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold border-2 border-white dark:border-slate-900 shadow-sm">
+                      {currentUser.name.charAt(0)}
+                    </div>
                   </button>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors font-medium"
-                  >
-                    <LogOut size={18} />
-                    تسجيل الخروج
-                  </button>
-                </div>
+                  
+                  {isUserDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-2 animate-in zoom-in-95 duration-200 z-50">
+                      <div className="p-2 border-b border-gray-100 dark:border-slate-800 mb-2 lg:hidden">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
+                        <p className="text-xs text-indigo-600 dark:text-indigo-400">{userRole?.name}</p>
+                      </div>
+                      <button
+                        onClick={() => { setIsChangePasswordOpen(true); setIsUserDropdownOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
+                      >
+                        <KeyRound size={18} />
+                        تغيير كلمة المرور
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors font-medium"
+                      >
+                        <LogOut size={18} />
+                        تسجيل الخروج
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link to="/login" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-sm hover:bg-indigo-700 transition-colors">
+                  <LogOut size={18} className="rotate-180" />
+                  <span>تسجيل الدخول</span>
+                </Link>
               )}
             </div>
           </div>

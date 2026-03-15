@@ -201,8 +201,8 @@ export default function ReturnCarHandover() {
               معلومات السيارة
             </h3>
             <div className="bg-gray-50 dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-              <p className="font-bold text-gray-800 dark:text-white">{car.name}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{car.plateNumber}</p>
+              <p className="font-bold text-gray-800 dark:text-white">{car?.name}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">{car?.plateNumber}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">رقم المرجع للاستلام: {handover.referenceNumber}</p>
             </div>
           </div>

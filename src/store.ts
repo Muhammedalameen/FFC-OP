@@ -1,17 +1,46 @@
 import { create } from 'zustand';
 import { persist, StateStorage, createJSONStorage } from 'zustand/middleware';
 import { format } from 'date-fns';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from './lib/firebase';
+
+const COLLECTIONS_TO_SYNC = [
+  'users', 'customRoles', 'branches', 'cars', 'inventoryItems', 
+  'operationalItems', 'revenueReports', 'inventoryReports', 
+  'inspectionReports', 'scheduledReadingItems', 'readingRecords', 
+  'tickets', 'carHandovers'
+];
 
 const firebaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
+      const stateData: any = {};
+      let hasNewData = false;
+      
+      for (const col of COLLECTIONS_TO_SYNC) {
+        const colRef = doc(db, 'system_data', col);
+        const colSnap = await getDoc(colRef);
+        if (colSnap.exists()) {
+          stateData[col] = colSnap.data().data || [];
+          hasNewData = true;
+        }
+      }
+      
+      // Fallback to old single document if new collections don't exist
       const docRef = doc(db, 'store_data', name);
       const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
+      
+      if (hasNewData) {
+        // If we have old data, merge it with new data (new data takes precedence)
+        let oldData = {};
+        if (docSnap.exists()) {
+          oldData = docSnap.data().data?.state || {};
+        }
+        return JSON.stringify({ state: { ...oldData, ...stateData }, version: 0 });
+      } else if (docSnap.exists()) {
         return JSON.stringify(docSnap.data().data);
       }
+      
       return null;
     } catch (error) {
       console.error('Failed to get state from Firebase', error);
@@ -20,16 +49,41 @@ const firebaseStorage: StateStorage = {
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
+      const parsed = JSON.parse(value);
+      const state = parsed.state;
+      
+      const batch = writeBatch(db);
+      
+      // Save each collection to its own document
+      for (const col of COLLECTIONS_TO_SYNC) {
+        if (state[col]) {
+          const colRef = doc(db, 'system_data', col);
+          batch.set(colRef, { data: state[col] });
+        }
+      }
+      
+      // Also save the main document as backup
       const docRef = doc(db, 'store_data', name);
-      await setDoc(docRef, { data: JSON.parse(value) });
+      batch.set(docRef, { data: parsed });
+      
+      await batch.commit();
     } catch (error) {
       console.error('Failed to save state to Firebase', error);
     }
   },
   removeItem: async (name: string): Promise<void> => {
     try {
+      const batch = writeBatch(db);
+      
+      for (const col of COLLECTIONS_TO_SYNC) {
+        const colRef = doc(db, 'system_data', col);
+        batch.delete(colRef);
+      }
+      
       const docRef = doc(db, 'store_data', name);
-      await deleteDoc(docRef);
+      batch.delete(docRef);
+      
+      await batch.commit();
     } catch (error) {
       console.error('Failed to delete state from Firebase', error);
     }
