@@ -14,72 +14,90 @@ const COLLECTIONS_TO_SYNC = [
 const firebaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
-      const stateData: any = {};
-      let hasNewData = false;
+      // Try to get from localStorage first for immediate UI update and fallback
+      const localData = localStorage.getItem(name);
       
-      for (const col of COLLECTIONS_TO_SYNC) {
-        const colRef = doc(db, 'system_data', col);
-        const colSnap = await getDoc(colRef);
-        if (colSnap.exists()) {
-          stateData[col] = colSnap.data().data || [];
-          hasNewData = true;
+      try {
+        const stateData: any = {};
+        let hasNewData = false;
+        
+        for (const col of COLLECTIONS_TO_SYNC) {
+          const colRef = doc(db, 'system_data', col);
+          const colSnap = await getDoc(colRef);
+          if (colSnap.exists()) {
+            stateData[col] = colSnap.data().data || [];
+            hasNewData = true;
+          }
         }
+        
+        const docRef = doc(db, 'store_data', name);
+        const docSnap = await getDoc(docRef);
+        
+        if (hasNewData) {
+          let oldData = {};
+          if (docSnap.exists()) {
+            oldData = docSnap.data().data?.state || {};
+          }
+          const merged = JSON.stringify({ state: { ...oldData, ...stateData }, version: 0 });
+          localStorage.setItem(name, merged); // Update local cache
+          return merged;
+        } else if (docSnap.exists()) {
+          const data = JSON.stringify(docSnap.data().data);
+          localStorage.setItem(name, data); // Update local cache
+          return data;
+        }
+      } catch (fbError: any) {
+        console.error('Firebase read error:', fbError);
+        if (fbError.code === 'permission-denied') {
+          console.error('FIREBASE PERMISSION DENIED: Please update your Firestore Security Rules.');
+        }
+        // If Firebase fails (e.g. permissions), return local data
+        if (localData) return localData;
       }
       
-      // Fallback to old single document if new collections don't exist
-      const docRef = doc(db, 'store_data', name);
-      const docSnap = await getDoc(docRef);
-      
-      if (hasNewData) {
-        // If we have old data, merge it with new data (new data takes precedence)
-        let oldData = {};
-        if (docSnap.exists()) {
-          oldData = docSnap.data().data?.state || {};
-        }
-        return JSON.stringify({ state: { ...oldData, ...stateData }, version: 0 });
-      } else if (docSnap.exists()) {
-        return JSON.stringify(docSnap.data().data);
-      }
-      
-      return null;
+      return localData;
     } catch (error) {
-      console.error('Failed to get state from Firebase', error);
+      console.error('Storage error', error);
       return null;
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
+      // Always save to localStorage immediately for offline support
+      localStorage.setItem(name, value);
+      
       const parsed = JSON.parse(value);
       const state = parsed.state;
       
       const batch = writeBatch(db);
       
-      // Save each collection to its own document
       for (const col of COLLECTIONS_TO_SYNC) {
-        if (state[col]) {
+        if (state[col] !== undefined) {
           const colRef = doc(db, 'system_data', col);
           batch.set(colRef, { data: state[col] });
         }
       }
       
-      // Also save the main document as backup
       const docRef = doc(db, 'store_data', name);
       batch.set(docRef, { data: parsed });
       
       await batch.commit();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save state to Firebase', error);
+      if (error.code === 'permission-denied') {
+        console.error('FIREBASE PERMISSION DENIED: Please update your Firestore Security Rules to allow writes.');
+      }
     }
   },
   removeItem: async (name: string): Promise<void> => {
     try {
-      const batch = writeBatch(db);
+      localStorage.removeItem(name);
       
+      const batch = writeBatch(db);
       for (const col of COLLECTIONS_TO_SYNC) {
         const colRef = doc(db, 'system_data', col);
         batch.delete(colRef);
       }
-      
       const docRef = doc(db, 'store_data', name);
       batch.delete(docRef);
       
