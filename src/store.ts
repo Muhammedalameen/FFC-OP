@@ -11,6 +11,8 @@ const COLLECTIONS_TO_SYNC = [
   'tickets', 'carHandovers'
 ];
 
+let isHydrated = false;
+
 const firebaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
@@ -40,10 +42,12 @@ const firebaseStorage: StateStorage = {
           }
           const merged = JSON.stringify({ state: { ...oldData, ...stateData }, version: 0 });
           localStorage.setItem(name, merged); // Update local cache
+          isHydrated = true;
           return merged;
         } else if (docSnap.exists()) {
           const data = JSON.stringify(docSnap.data().data);
           localStorage.setItem(name, data); // Update local cache
+          isHydrated = true;
           return data;
         }
       } catch (fbError: any) {
@@ -52,12 +56,15 @@ const firebaseStorage: StateStorage = {
           console.error('FIREBASE PERMISSION DENIED: Please update your Firestore Security Rules.');
         }
         // If Firebase fails (e.g. permissions), return local data
+        isHydrated = true;
         if (localData) return localData;
       }
       
+      isHydrated = true;
       return localData;
     } catch (error) {
       console.error('Storage error', error);
+      isHydrated = true;
       return null;
     }
   },
@@ -65,6 +72,12 @@ const firebaseStorage: StateStorage = {
     try {
       // Always save to localStorage immediately for offline support
       localStorage.setItem(name, value);
+      
+      // CRITICAL FIX: Prevent overwriting Firebase with initial state before hydration completes
+      if (!isHydrated) {
+        console.warn('Skipping Firebase write - hydration not complete');
+        return;
+      }
       
       const parsed = JSON.parse(value);
       const state = parsed.state;
