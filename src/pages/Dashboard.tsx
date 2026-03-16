@@ -71,27 +71,31 @@ export default function Dashboard() {
       relevantBranches.forEach(branchId => {
         if (!branchId) return;
         scheduledReadingItems.forEach(item => {
-          const record = readingRecords.find(r => r.itemId === item.id && r.branchId === branchId && r.date === day);
+          const times = item.scheduledTimes || (item.scheduledTime ? [item.scheduledTime] : []);
           
-          if (record) {
-            // Check if late (simple string comparison works for HH:mm in 24h format)
-            if (record.time > item.scheduledTime) {
-              lateCount++;
+          times.forEach(time => {
+            const record = readingRecords.find(r => r.itemId === item.id && r.branchId === branchId && r.date === day && (r.scheduledTime === time || (!r.scheduledTime && !item.scheduledTimes)));
+            
+            if (record) {
+              // Check if late (simple string comparison works for HH:mm in 24h format)
+              if (record.time > time) {
+                lateCount++;
+              } else {
+                onTimeCount++;
+              }
             } else {
-              onTimeCount++;
-            }
-          } else {
-            // If day is today, check if time passed
-            if (day === format(new Date(), 'yyyy-MM-dd')) {
-              const now = format(new Date(), 'HH:mm');
-              if (now > item.scheduledTime) {
+              // If day is today, check if time passed
+              if (day === format(new Date(), 'yyyy-MM-dd')) {
+                const now = format(new Date(), 'HH:mm');
+                if (now > time) {
+                  missedCount++;
+                }
+              } else if (day < format(new Date(), 'yyyy-MM-dd')) {
+                // Past day, definitely missed
                 missedCount++;
               }
-            } else if (day < format(new Date(), 'yyyy-MM-dd')) {
-              // Past day, definitely missed
-              missedCount++;
             }
-          }
+          });
         });
       });
     });

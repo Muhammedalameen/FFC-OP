@@ -18,7 +18,7 @@ import CarHandovers from './pages/CarHandovers';
 import NewCarHandover from './pages/NewCarHandover';
 import ReturnCarHandover from './pages/ReturnCarHandover';
 import LoadingScreen from './components/LoadingScreen';
-import { useStore } from './store';
+import { useStore, initFirebaseSync } from './store';
 
 // Protected Route Component (Now optional)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -39,6 +39,7 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       await checkDbConnection();
+      await initFirebaseSync();
       
       // Add a small delay to show the nice animation
       setTimeout(() => {

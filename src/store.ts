@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { persist, StateStorage, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { format } from 'date-fns';
-import { doc, getDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './lib/firebase';
 
 const COLLECTIONS_TO_SYNC = [
@@ -11,114 +11,71 @@ const COLLECTIONS_TO_SYNC = [
   'tickets', 'carHandovers'
 ];
 
-let isHydrated = false;
+let isFirebaseInitialized = false;
+const firebaseLoadedCollections = new Set<string>();
 
-const firebaseStorage: StateStorage = {
-  getItem: async (name: string): Promise<string | null> => {
+export const initFirebaseSync = async () => {
+  if (isFirebaseInitialized) return;
+  isFirebaseInitialized = true;
+  
+  const state = useStore.getState();
+  
+  // 1. Initial push if Firebase is empty (for first time setup)
+  for (const col of COLLECTIONS_TO_SYNC) {
+    const colRef = doc(db, 'system_data', col);
     try {
-      // Try to get from localStorage first for immediate UI update and fallback
-      const localData = localStorage.getItem(name);
-      
-      try {
-        const stateData: any = {};
-        let hasNewData = false;
-        
-        for (const col of COLLECTIONS_TO_SYNC) {
-          const colRef = doc(db, 'system_data', col);
-          const colSnap = await getDoc(colRef);
-          if (colSnap.exists()) {
-            stateData[col] = colSnap.data().data || [];
-            hasNewData = true;
-          }
-        }
-        
-        const docRef = doc(db, 'store_data', name);
-        const docSnap = await getDoc(docRef);
-        
-        if (hasNewData) {
-          let oldData = {};
-          if (docSnap.exists()) {
-            oldData = docSnap.data().data?.state || {};
-          }
-          const merged = JSON.stringify({ state: { ...oldData, ...stateData }, version: 0 });
-          localStorage.setItem(name, merged); // Update local cache
-          isHydrated = true;
-          return merged;
-        } else if (docSnap.exists()) {
-          const data = JSON.stringify(docSnap.data().data);
-          localStorage.setItem(name, data); // Update local cache
-          isHydrated = true;
-          return data;
-        }
-      } catch (fbError: any) {
-        console.error('Firebase read error:', fbError);
-        if (fbError.code === 'permission-denied') {
-          console.error('FIREBASE PERMISSION DENIED: Please update your Firestore Security Rules.');
-        }
-        // If Firebase fails (e.g. permissions), return local data
-        isHydrated = true;
-        if (localData) return localData;
+      const docSnap = await getDoc(colRef);
+      const localData = state[col as keyof AppState];
+      if (!docSnap.exists() && Array.isArray(localData) && localData.length > 0) {
+        await setDoc(colRef, { data: localData });
+        firebaseLoadedCollections.add(col); // Mark as loaded since we just initialized it
       }
-      
-      isHydrated = true;
-      return localData;
-    } catch (error) {
-      console.error('Storage error', error);
-      isHydrated = true;
-      return null;
+    } catch (e) {
+      console.error(`Error checking initial state for ${col}:`, e);
     }
-  },
-  setItem: async (name: string, value: string): Promise<void> => {
-    try {
-      // Always save to localStorage immediately for offline support
-      localStorage.setItem(name, value);
-      
-      // CRITICAL FIX: Prevent overwriting Firebase with initial state before hydration completes
-      if (!isHydrated) {
-        console.warn('Skipping Firebase write - hydration not complete');
-        return;
-      }
-      
-      const parsed = JSON.parse(value);
-      const state = parsed.state;
-      
-      const batch = writeBatch(db);
-      
-      for (const col of COLLECTIONS_TO_SYNC) {
-        if (state[col] !== undefined) {
-          const colRef = doc(db, 'system_data', col);
-          batch.set(colRef, { data: state[col] });
+  }
+
+  // 2. Listen to Firebase changes (Real-time sync)
+  COLLECTIONS_TO_SYNC.forEach(col => {
+    const colRef = doc(db, 'system_data', col);
+    onSnapshot(colRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const remoteData = docSnap.data().data;
+        const localData = useStore.getState()[col as keyof AppState];
+        
+        // Mark as loaded from Firebase
+        firebaseLoadedCollections.add(col);
+        
+        // Only update if data is actually different to prevent infinite loops
+        if (JSON.stringify(remoteData) !== JSON.stringify(localData)) {
+          useStore.setState({ [col]: remoteData } as any);
         }
+      } else {
+        // Document doesn't exist in Firebase yet, mark as loaded so local changes can be pushed
+        firebaseLoadedCollections.add(col);
       }
+    }, (error) => {
+      console.error(`Error listening to ${col}:`, error);
+    });
+  });
+
+  // 3. Listen to local changes and push to Firebase
+  useStore.subscribe((state, prevState) => {
+    COLLECTIONS_TO_SYNC.forEach(col => {
+      // ONLY push to Firebase if we have already loaded the initial data from Firebase
+      if (!firebaseLoadedCollections.has(col)) return;
+
+      const localData = state[col as keyof AppState];
+      const prevLocalData = prevState[col as keyof AppState];
       
-      const docRef = doc(db, 'store_data', name);
-      batch.set(docRef, { data: parsed });
-      
-      await batch.commit();
-    } catch (error: any) {
-      console.error('Failed to save state to Firebase', error);
-      if (error.code === 'permission-denied') {
-        console.error('FIREBASE PERMISSION DENIED: Please update your Firestore Security Rules to allow writes.');
-      }
-    }
-  },
-  removeItem: async (name: string): Promise<void> => {
-    try {
-      localStorage.removeItem(name);
-      
-      const batch = writeBatch(db);
-      for (const col of COLLECTIONS_TO_SYNC) {
+      if (localData !== prevLocalData) {
         const colRef = doc(db, 'system_data', col);
-        batch.delete(colRef);
+        setDoc(colRef, { data: localData }).catch(e => {
+          console.error(`Error saving ${col} to Firebase:`, e);
+        });
       }
-      const docRef = doc(db, 'store_data', name);
-      batch.delete(docRef);
-      
-      await batch.commit();
-    } catch (error) {
-      console.error('Failed to delete state from Firebase', error);
-    }
-  },
+    });
+  });
 };
 
 export const AVAILABLE_PERMISSIONS = [
@@ -306,8 +263,10 @@ export interface ScheduledReadingItem {
   name: string;
   unit?: string; // e.g., '°C' or empty for checkbox
   type: 'number' | 'boolean';
-  scheduledTime: string; // HH:mm
+  scheduledTime?: string; // Legacy: HH:mm
+  scheduledTimes?: string[]; // Array of HH:mm times
   category: string;
+  requiredPhotosCount?: number; // Number of photos required for this reading
 }
 
 export interface ReadingRecord {
@@ -318,9 +277,11 @@ export interface ReadingRecord {
   value: string | number | boolean;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm (actual recording time)
+  scheduledTime?: string; // The specific scheduled time this reading is for
   recordedBy: string;
   createdAt: string;
-  image?: string;
+  image?: string; // Legacy single image
+  images?: string[]; // Multiple images
 }
 
 export interface TicketComment {
@@ -947,7 +908,6 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'restaurant-system-storage',
-      storage: createJSONStorage(() => firebaseStorage),
       partialize: (state) => {
         // Exclude session-specific and temporary data from Firestore
         const { currentUser, notifications, isDbConnected, ...rest } = state;

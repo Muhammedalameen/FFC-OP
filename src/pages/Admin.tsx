@@ -40,8 +40,9 @@ export default function Admin() {
     name: '', 
     unit: '', 
     type: 'number', 
-    scheduledTime: '09:00', 
-    category: '' 
+    scheduledTimes: ['09:00'], 
+    category: '',
+    requiredPhotosCount: 0
   });
 
   // Copy Inventory State
@@ -153,7 +154,7 @@ export default function Admin() {
     } else {
       addScheduledReadingItem(newScheduledItem);
     }
-    setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTime: '09:00', category: '' });
+    setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTimes: ['09:00'], category: '', requiredPhotosCount: 0 });
   };
 
   const handleEditScheduledItem = (item: ScheduledReadingItem) => {
@@ -162,8 +163,9 @@ export default function Admin() {
       name: item.name, 
       unit: item.unit || '', 
       type: item.type, 
-      scheduledTime: item.scheduledTime, 
-      category: item.category 
+      scheduledTimes: item.scheduledTimes || (item.scheduledTime ? [item.scheduledTime] : ['09:00']), 
+      category: item.category,
+      requiredPhotosCount: item.requiredPhotosCount || 0
     });
     setActiveTab('scheduled');
   };
@@ -505,36 +507,93 @@ export default function Admin() {
         {activeTab === 'scheduled' && (
           <div className="space-y-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">{editingId ? 'تعديل قراءة مجدولة' : 'إضافة قراءة مجدولة جديدة'}</h2>
-            <form onSubmit={handleAddScheduledItem} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">اسم القراءة</label>
-                <input type="text" value={newScheduledItem.name} onChange={e => setNewScheduledItem({...newScheduledItem, name: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required placeholder="مثال: حرارة الثلاجة" />
+            <form onSubmit={handleAddScheduledItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">اسم القراءة</label>
+                  <input type="text" value={newScheduledItem.name} onChange={e => setNewScheduledItem({...newScheduledItem, name: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required placeholder="مثال: حرارة الثلاجة" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">النوع</label>
+                  <select value={newScheduledItem.type} onChange={e => setNewScheduledItem({...newScheduledItem, type: e.target.value as 'number' | 'boolean'})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required>
+                    <option value="number">رقمي (قيمة)</option>
+                    <option value="boolean">فحص (نعم/لا)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">الوحدة (اختياري)</label>
+                  <input type="text" value={newScheduledItem.unit} onChange={e => setNewScheduledItem({...newScheduledItem, unit: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" placeholder="مثال: °C" disabled={newScheduledItem.type === 'boolean'} />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">النوع</label>
-                <select value={newScheduledItem.type} onChange={e => setNewScheduledItem({...newScheduledItem, type: e.target.value as 'number' | 'boolean'})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required>
-                  <option value="number">رقمي (قيمة)</option>
-                  <option value="boolean">فحص (نعم/لا)</option>
-                </select>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">أوقات التسجيل</label>
+                  <div className="flex gap-2 mb-2">
+                    <input 
+                      type="time" 
+                      id="timeInput"
+                      className="flex-1 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('timeInput') as HTMLInputElement;
+                        if (input.value && !newScheduledItem.scheduledTimes?.includes(input.value)) {
+                          setNewScheduledItem({
+                            ...newScheduledItem,
+                            scheduledTimes: [...(newScheduledItem.scheduledTimes || []), input.value].sort()
+                          });
+                          input.value = '';
+                        }
+                      }}
+                      className="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-2 rounded-xl hover:bg-indigo-200 transition-colors"
+                    >
+                      إضافة
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {newScheduledItem.scheduledTimes?.map(time => (
+                      <span key={time} className="inline-flex items-center gap-1 bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200 px-2 py-1 rounded-lg text-sm">
+                        {time}
+                        <button 
+                          type="button" 
+                          onClick={() => setNewScheduledItem({
+                            ...newScheduledItem,
+                            scheduledTimes: newScheduledItem.scheduledTimes?.filter(t => t !== time)
+                          })}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                    {(!newScheduledItem.scheduledTimes || newScheduledItem.scheduledTimes.length === 0) && (
+                      <span className="text-sm text-red-500">يجب إضافة وقت واحد على الأقل</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">التصنيف</label>
+                  <input type="text" value={newScheduledItem.category} onChange={e => setNewScheduledItem({...newScheduledItem, category: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required placeholder="مثال: المعدات" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">عدد الصور المطلوبة</label>
+                  <input type="number" min="0" max="5" value={newScheduledItem.requiredPhotosCount || 0} onChange={e => setNewScheduledItem({...newScheduledItem, requiredPhotosCount: parseInt(e.target.value) || 0})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" />
+                  <p className="text-xs text-gray-500 mt-1">0 يعني غير مطلوب</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">الوحدة (اختياري)</label>
-                <input type="text" value={newScheduledItem.unit} onChange={e => setNewScheduledItem({...newScheduledItem, unit: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" placeholder="مثال: °C" disabled={newScheduledItem.type === 'boolean'} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">وقت التسجيل</label>
-                <input type="time" value={newScheduledItem.scheduledTime} onChange={e => setNewScheduledItem({...newScheduledItem, scheduledTime: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">التصنيف</label>
-                <input type="text" value={newScheduledItem.category} onChange={e => setNewScheduledItem({...newScheduledItem, category: e.target.value})} className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl px-3 py-2" required placeholder="مثال: المعدات" />
-              </div>
-              <div className="md:col-span-3 lg:col-span-5 flex gap-2">
-                <button type="submit" className="flex-1 bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700 flex justify-center items-center gap-2 transition-all">
+
+              <div className="md:col-span-2 lg:col-span-4 flex gap-2 mt-4">
+                <button 
+                  type="submit" 
+                  disabled={!newScheduledItem.scheduledTimes || newScheduledItem.scheduledTimes.length === 0}
+                  className="flex-1 bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700 flex justify-center items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <Plus size={18} /> {editingId ? 'حفظ التعديلات' : 'إضافة القراءة'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={() => { setEditingId(null); setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTime: '09:00', category: '' }); }} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white px-4 py-2 rounded-xl">إلغاء</button>
+                  <button type="button" onClick={() => { setEditingId(null); setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTimes: ['09:00'], category: '', requiredPhotosCount: 0 }); }} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white px-4 py-2 rounded-xl">إلغاء</button>
                 )}
               </div>
             </form>
@@ -547,22 +606,41 @@ export default function Admin() {
                     <tr>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">اسم القراءة</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">النوع</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">الوقت</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">الأوقات</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">التصنيف</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">الصور</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400 w-24">إجراء</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                     {scheduledReadingItems.map(item => (
                       <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white">{item.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                          {item.name} {item.unit ? `(${item.unit})` : ''}
+                          <span className="inline-flex items-center gap-1 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-lg">
+                            {item.type === 'number' ? 'رقمي' : 'فحص'}
+                            {item.unit && <span className="text-gray-500 dark:text-slate-400 text-xs">({item.unit})</span>}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                          {item.type === 'number' ? 'رقمي' : 'فحص'}
+                          <div className="flex flex-wrap gap-1">
+                            {(item.scheduledTimes || (item.scheduledTime ? [item.scheduledTime] : [])).map(t => (
+                              <span key={t} className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-xs">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.scheduledTime}</td>
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.category}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {item.requiredPhotosCount ? (
+                            <span className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-lg text-xs">
+                              {item.requiredPhotosCount} صور
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm flex gap-2">
                           <button onClick={() => handleEditScheduledItem(item)} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">تعديل</button>
                           <button onClick={() => deleteScheduledReadingItem(item.id)} className="text-red-500 hover:text-red-700">
