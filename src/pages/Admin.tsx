@@ -10,7 +10,7 @@ export default function Admin() {
     users, addUser, updateUser, deleteUser,
     branches, addBranch, updateBranch, deleteBranch,
     operationalItems, addOperationalItem, updateOperationalItem, deleteOperationalItem,
-    inventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem, copyInventoryItems,
+    inventoryItems, addInventoryItem, addInventoryItems, updateInventoryItem, deleteInventoryItem, copyInventoryItems,
     addCustomRole, updateCustomRole, deleteCustomRole,
     scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem
   } = useStore();
@@ -48,6 +48,7 @@ export default function Admin() {
   // Copy Inventory State
   const [copySource, setCopySource] = useState('');
   const [copyTarget, setCopyTarget] = useState('');
+  const [importProgress, setImportProgress] = useState<{current: number, total: number} | null>(null);
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const canManage = userRole?.permissions.includes('manage_system') || users.length === 0;
@@ -180,12 +181,12 @@ export default function Admin() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedBranchId) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
@@ -193,27 +194,47 @@ export default function Admin() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
         
-        let importedCount = 0;
-        data.forEach((row: any) => {
+        const validItems = data.map((row: any) => {
           const name = row['اسم الصنف'] || row['name'] || row['Name'] || row['الصنف'];
           const category = row['مجموعة المنتج'] || row['التصنيف'] || row['category'] || row['Category'] || 'عام';
           const unit = row['الوحدة'] || row['unit'] || row['Unit'] || 'حبة';
           
           if (name) {
-            addInventoryItem({
+            return {
               name: String(name).trim(),
               category: String(category).trim(),
               unit: String(unit).trim(),
               branchIds: [selectedBranchId]
-            });
-            importedCount++;
+            };
           }
-        });
+          return null;
+        }).filter(Boolean) as Omit<InventoryItem, 'id'>[];
+
+        if (validItems.length === 0) {
+          alert('لم يتم العثور على أصناف صالحة في الملف.');
+          return;
+        }
+
+        setImportProgress({ current: 0, total: validItems.length });
         
-        alert(`تم استيراد ${importedCount} صنف بنجاح`);
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < validItems.length; i += CHUNK_SIZE) {
+          const chunk = validItems.slice(i, i + CHUNK_SIZE);
+          addInventoryItems(chunk);
+          setImportProgress({ current: Math.min(i + CHUNK_SIZE, validItems.length), total: validItems.length });
+          // A small delay to allow UI to update and Firebase to sync
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        setTimeout(() => {
+          setImportProgress(null);
+          alert(`تم استيراد ${validItems.length} صنف بنجاح`);
+        }, 500);
+
       } catch (error) {
         console.error('Error parsing Excel file:', error);
         alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
+        setImportProgress(null);
       }
       
       // Reset input
@@ -761,14 +782,26 @@ export default function Admin() {
                       className="hidden" 
                       id="excel-upload" 
                       ref={fileInputRef}
+                      disabled={importProgress !== null}
                     />
                     <label 
                       htmlFor="excel-upload" 
-                      className="cursor-pointer bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-4 py-2 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/30 font-bold flex items-center gap-2 transition-colors border border-emerald-200 dark:border-emerald-800/50"
+                      className={`cursor-pointer px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors border ${importProgress ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50'}`}
                     >
                       <Upload size={18} />
-                      <span className="hidden sm:inline">استيراد من Excel</span>
+                      <span className="hidden sm:inline">{importProgress ? 'جاري الاستيراد...' : 'استيراد من Excel'}</span>
                     </label>
+                    {importProgress && (
+                      <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5 mt-2 overflow-hidden">
+                        <div 
+                          className="bg-emerald-600 h-2.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                        ></div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 text-center mt-1">
+                          {importProgress.current} / {importProgress.total}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

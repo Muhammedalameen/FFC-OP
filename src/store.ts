@@ -380,6 +380,7 @@ interface AppState {
   deleteCar: (id: string) => void;
   
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
+  addInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
   copyInventoryItems: (fromBranchId: string, toBranchId: string) => void;
@@ -614,6 +615,13 @@ export const useStore = create<AppState>()(
       addInventoryItem: (item) => {
         set((state) => ({ inventoryItems: [...state.inventoryItems, { ...item, id: generateId() }] }));
         get().addNotification('تم إضافة الصنف بنجاح', 'success');
+      },
+      addInventoryItems: (items) => {
+        set((state) => {
+          const newItems = items.map(item => ({ ...item, id: generateId() }));
+          return { inventoryItems: [...state.inventoryItems, ...newItems] };
+        });
+        get().addNotification(`تم إضافة ${items.length} صنف بنجاح`, 'success');
       },
       updateInventoryItem: (id, item) => {
         set((state) => ({ inventoryItems: state.inventoryItems.map(i => i.id === id ? { ...i, ...item } : i) }));
