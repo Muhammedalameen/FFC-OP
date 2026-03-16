@@ -76,11 +76,18 @@ export const initFirebaseSync = async () => {
           clearTimeout(syncTimeouts[col]);
         }
         
+        // Mark as pending
+        state.setSyncStatus(col, 'pending');
+        
         // Debounce the write to Firebase by 2 seconds
         syncTimeouts[col] = setTimeout(() => {
+          state.setSyncStatus(col, 'syncing');
           const colRef = doc(db, 'system_data', col);
-          setDoc(colRef, { data: localData }).catch(e => {
+          setDoc(colRef, { data: localData }).then(() => {
+            useStore.getState().setSyncStatus(col, 'success');
+          }).catch(e => {
             console.error(`Error saving ${col} to Firebase:`, e);
+            useStore.getState().setSyncStatus(col, 'error', e.message);
           });
         }, 2000);
       }
@@ -345,6 +352,14 @@ export interface Notification {
   undoAction?: () => void;
 }
 
+export type SyncStatusType = 'idle' | 'pending' | 'syncing' | 'success' | 'error';
+
+export interface SyncStatus {
+  status: SyncStatusType;
+  lastSynced: string | null;
+  error?: string;
+}
+
 interface AppState {
   users: User[];
   customRoles: CustomRole[];
@@ -363,8 +378,10 @@ interface AppState {
   theme: 'light' | 'dark' | 'system';
   notifications: Notification[];
   isDbConnected: boolean | null;
+  syncStatuses: Record<string, SyncStatus>;
   
   // Actions
+  setSyncStatus: (collection: string, status: SyncStatusType, error?: string) => void;
   checkDbConnection: () => Promise<void>;
   login: (employeeId: string, pin: string, rememberMe?: boolean) => boolean;
   logout: () => void;
@@ -528,6 +545,23 @@ export const useStore = create<AppState>()(
       theme: 'system',
       notifications: [],
       isDbConnected: null,
+      syncStatuses: COLLECTIONS_TO_SYNC.reduce((acc, col) => {
+        acc[col] = { status: 'idle', lastSynced: null };
+        return acc;
+      }, {} as Record<string, SyncStatus>),
+
+      setSyncStatus: (collection, status, error) => {
+        set((state) => ({
+          syncStatuses: {
+            ...state.syncStatuses,
+            [collection]: {
+              status,
+              lastSynced: status === 'success' ? new Date().toISOString() : state.syncStatuses[collection]?.lastSynced || null,
+              error
+            }
+          }
+        }));
+      },
 
       checkDbConnection: async () => {
         try {

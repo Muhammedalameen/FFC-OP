@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem } from '../store';
-import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car } from 'lucide-react';
+import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car, Activity, CheckCircle2, XCircle, Loader2, Clock3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Cars from './admin/Cars';
 
@@ -12,10 +12,11 @@ export default function Admin() {
     operationalItems, addOperationalItem, updateOperationalItem, deleteOperationalItem,
     inventoryItems, addInventoryItem, addInventoryItems, updateInventoryItem, deleteInventoryItem, deleteAllInventoryItems, copyInventoryItems,
     addCustomRole, updateCustomRole, deleteCustomRole,
-    scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem
+    scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem,
+    syncStatuses
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled' | 'cars'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled' | 'cars' | 'sync'>('users');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -181,10 +182,13 @@ export default function Admin() {
     }
   };
 
+  const abortImportRef = useRef(false);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedBranchId) return;
 
+    abortImportRef.current = false;
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -219,17 +223,25 @@ export default function Admin() {
         
         const CHUNK_SIZE = 50;
         for (let i = 0; i < validItems.length; i += CHUNK_SIZE) {
+          if (abortImportRef.current) {
+            alert('تم إيقاف الاستيراد.');
+            break;
+          }
           const chunk = validItems.slice(i, i + CHUNK_SIZE);
           addInventoryItems(chunk);
           setImportProgress({ current: Math.min(i + CHUNK_SIZE, validItems.length), total: validItems.length });
           // A small delay to allow UI to update and Firebase to sync
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
         
-        setTimeout(() => {
+        if (!abortImportRef.current) {
+          setTimeout(() => {
+            setImportProgress(null);
+            alert(`تم استيراد ${validItems.length} صنف بنجاح`);
+          }, 500);
+        } else {
           setImportProgress(null);
-          alert(`تم استيراد ${validItems.length} صنف بنجاح`);
-        }, 500);
+        }
 
       } catch (error) {
         console.error('Error parsing Excel file:', error);
@@ -262,6 +274,7 @@ export default function Admin() {
     { id: 'scheduled', name: 'القراءات المجدولة', icon: Clock },
     { id: 'inventory', name: 'أصناف المخزون', icon: Package },
     { id: 'cars', name: 'السيارات', icon: Car },
+    { id: 'sync', name: 'حالة المزامنة', icon: Activity },
   ] as const;
 
   return (
@@ -761,6 +774,7 @@ export default function Admin() {
                         <button 
                           onClick={() => {
                             if (window.confirm('هل أنت متأكد من رغبتك في حذف جميع أصناف المخزون؟ هذا الإجراء لا يمكن التراجع عنه وسيحذف جميع الأصناف من كافة الفروع.')) {
+                              abortImportRef.current = true;
                               setImportProgress(null); // Stop any ongoing import progress UI
                               deleteAllInventoryItems();
                             }
@@ -949,6 +963,84 @@ export default function Admin() {
 
         {activeTab === 'cars' && (
           <Cars />
+        )}
+
+        {activeTab === 'sync' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">حالة المزامنة مع قاعدة البيانات</h2>
+            </div>
+            
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-right">
+                  <thead className="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-slate-700">
+                    <tr>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">القسم (Collection)</th>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">الحالة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">آخر مزامنة ناجحة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">تفاصيل الخطأ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {Object.entries(syncStatuses).map(([collection, info]) => {
+                      let StatusIcon = Clock3;
+                      let statusColor = 'text-gray-500';
+                      let statusBg = 'bg-gray-100 dark:bg-gray-800';
+                      let statusText = 'في الانتظار';
+
+                      switch (info.status) {
+                        case 'pending':
+                          StatusIcon = Clock3;
+                          statusColor = 'text-yellow-600 dark:text-yellow-400';
+                          statusBg = 'bg-yellow-50 dark:bg-yellow-900/20';
+                          statusText = 'في قائمة الانتظار';
+                          break;
+                        case 'syncing':
+                          StatusIcon = Loader2;
+                          statusColor = 'text-blue-600 dark:text-blue-400';
+                          statusBg = 'bg-blue-50 dark:bg-blue-900/20';
+                          statusText = 'جاري المزامنة...';
+                          break;
+                        case 'success':
+                          StatusIcon = CheckCircle2;
+                          statusColor = 'text-emerald-600 dark:text-emerald-400';
+                          statusBg = 'bg-emerald-50 dark:bg-emerald-900/20';
+                          statusText = 'مكتملة';
+                          break;
+                        case 'error':
+                          StatusIcon = XCircle;
+                          statusColor = 'text-red-600 dark:text-red-400';
+                          statusBg = 'bg-red-50 dark:bg-red-900/20';
+                          statusText = 'فشل المزامنة';
+                          break;
+                      }
+
+                      return (
+                        <tr key={collection} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="font-medium text-gray-900 dark:text-white">{collection}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusBg} ${statusColor}`}>
+                              <StatusIcon size={14} className={info.status === 'syncing' ? 'animate-spin' : ''} />
+                              {statusText}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">
+                            {info.lastSynced ? new Date(info.lastSynced).toLocaleString('ar-SA') : 'لم تتم المزامنة بعد'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={info.error}>
+                            {info.error || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
