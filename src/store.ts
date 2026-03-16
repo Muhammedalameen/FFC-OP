@@ -60,6 +60,8 @@ export const initFirebaseSync = async () => {
   });
 
   // 3. Listen to local changes and push to Firebase
+  const syncTimeouts: Record<string, NodeJS.Timeout> = {};
+  
   useStore.subscribe((state, prevState) => {
     COLLECTIONS_TO_SYNC.forEach(col => {
       // ONLY push to Firebase if we have already loaded the initial data from Firebase
@@ -69,10 +71,18 @@ export const initFirebaseSync = async () => {
       const prevLocalData = prevState[col as keyof AppState];
       
       if (localData !== prevLocalData) {
-        const colRef = doc(db, 'system_data', col);
-        setDoc(colRef, { data: localData }).catch(e => {
-          console.error(`Error saving ${col} to Firebase:`, e);
-        });
+        // Clear existing timeout for this collection
+        if (syncTimeouts[col]) {
+          clearTimeout(syncTimeouts[col]);
+        }
+        
+        // Debounce the write to Firebase by 2 seconds
+        syncTimeouts[col] = setTimeout(() => {
+          const colRef = doc(db, 'system_data', col);
+          setDoc(colRef, { data: localData }).catch(e => {
+            console.error(`Error saving ${col} to Firebase:`, e);
+          });
+        }, 2000);
       }
     });
   });
@@ -383,6 +393,7 @@ interface AppState {
   addInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
+  deleteAllInventoryItems: () => void;
   copyInventoryItems: (fromBranchId: string, toBranchId: string) => void;
   
   addOperationalItem: (item: Omit<OperationalItem, 'id'>) => void;
@@ -630,6 +641,10 @@ export const useStore = create<AppState>()(
       deleteInventoryItem: (id) => {
         set((state) => ({ inventoryItems: state.inventoryItems.filter(i => i.id !== id) }));
         get().addNotification('تم حذف الصنف', 'success');
+      },
+      deleteAllInventoryItems: () => {
+        set({ inventoryItems: [] });
+        get().addNotification('تم حذف جميع أصناف المخزون بنجاح', 'success');
       },
       copyInventoryItems: (fromBranchId, toBranchId) => {
         set((state) => {

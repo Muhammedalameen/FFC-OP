@@ -10,7 +10,7 @@ export default function Admin() {
     users, addUser, updateUser, deleteUser,
     branches, addBranch, updateBranch, deleteBranch,
     operationalItems, addOperationalItem, updateOperationalItem, deleteOperationalItem,
-    inventoryItems, addInventoryItem, addInventoryItems, updateInventoryItem, deleteInventoryItem, copyInventoryItems,
+    inventoryItems, addInventoryItem, addInventoryItems, updateInventoryItem, deleteInventoryItem, deleteAllInventoryItems, copyInventoryItems,
     addCustomRole, updateCustomRole, deleteCustomRole,
     scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem
   } = useStore();
@@ -749,6 +749,27 @@ export default function Admin() {
                       >
                         <Plus size={18} /> إضافة صنف جديد
                       </button>
+
+                      <div className="pt-4 border-t border-indigo-100 dark:border-indigo-900/30 mt-4">
+                        <h4 className="text-sm font-bold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
+                          <Trash2 size={16} />
+                          منطقة الخطر
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+                          في حال حدوث مشكلة أثناء استيراد الأصناف، يمكنك إيقاف العملية وحذف جميع الأصناف من قاعدة البيانات للبدء من جديد.
+                        </p>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('هل أنت متأكد من رغبتك في حذف جميع أصناف المخزون؟ هذا الإجراء لا يمكن التراجع عنه وسيحذف جميع الأصناف من كافة الفروع.')) {
+                              setImportProgress(null); // Stop any ongoing import progress UI
+                              deleteAllInventoryItems();
+                            }
+                          }}
+                          className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/50 hover:bg-red-100 dark:hover:bg-red-900/30 py-2 rounded-xl transition-colors text-sm font-bold flex items-center justify-center gap-2"
+                        >
+                          إيقاف الاستيراد وحذف جميع الأصناف
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
