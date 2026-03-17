@@ -391,17 +391,24 @@ export default function Admin() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">الأذونات</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {AVAILABLE_PERMISSIONS.map(perm => (
-                    <label key={perm.id} className="flex items-center gap-3 p-3 border border-gray-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={newRole.permissions.includes(perm.id)}
-                        onChange={() => togglePermission(perm.id)}
-                        className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-slate-300">{perm.name}</span>
-                    </label>
+                <div className="space-y-6">
+                  {Array.from(new Set(AVAILABLE_PERMISSIONS.map(p => p.category))).map(category => (
+                    <div key={category} className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
+                      <h4 className="font-bold text-gray-900 dark:text-white mb-3">{category}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {AVAILABLE_PERMISSIONS.filter(p => p.category === category).map(perm => (
+                          <label key={perm.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={newRole.permissions.includes(perm.id)}
+                              onChange={() => togglePermission(perm.id)}
+                              className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm text-gray-700 dark:text-slate-300">{perm.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

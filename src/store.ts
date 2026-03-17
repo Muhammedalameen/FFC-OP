@@ -96,53 +96,55 @@ export const initFirebaseSync = async () => {
 };
 
 export const AVAILABLE_PERMISSIONS = [
-  { id: 'view_all_branches', name: 'الاطلاع على كافة الفروع' },
-  { id: 'manage_system', name: 'إدارة النظام (المستخدمين، الفروع، الصلاحيات، الإعدادات)' },
+  { id: 'view_all_branches', name: 'الاطلاع على كافة الفروع', category: 'عام' },
+  { id: 'manage_system', name: 'إدارة النظام (المستخدمين، الفروع، الصلاحيات، الإعدادات)', category: 'عام' },
   
   // Revenue Permissions
-  { id: 'view_revenue', name: 'عرض الإيرادات' },
-  { id: 'add_revenue', name: 'إضافة إيراد' },
-  { id: 'edit_revenue', name: 'تعديل إيراد' },
-  { id: 'delete_revenue', name: 'حذف إيراد' },
+  { id: 'view_revenue', name: 'عرض الإيرادات', category: 'الإيرادات' },
+  { id: 'add_revenue', name: 'إضافة إيراد', category: 'الإيرادات' },
+  { id: 'edit_revenue', name: 'تعديل إيراد', category: 'الإيرادات' },
+  { id: 'delete_revenue', name: 'حذف إيراد', category: 'الإيرادات' },
 
   // Inventory Permissions
-  { id: 'view_inventory', name: 'عرض المخزون' },
-  { id: 'add_inventory', name: 'إضافة مخزون' },
-  { id: 'edit_inventory', name: 'تعديل مخزون' },
-  { id: 'delete_inventory', name: 'حذف مخزون' },
+  { id: 'view_inventory', name: 'عرض المخزون', category: 'المخزون' },
+  { id: 'add_inventory', name: 'إضافة مخزون', category: 'المخزون' },
+  { id: 'edit_inventory', name: 'تعديل مخزون', category: 'المخزون' },
+  { id: 'delete_inventory', name: 'حذف مخزون', category: 'المخزون' },
+  { id: 'view_need_report', name: 'عرض تقارير الاحتياج', category: 'المخزون' },
+  { id: 'view_waste_report', name: 'عرض تقارير الهدر', category: 'المخزون' },
 
   // Scheduled Readings Permissions
-  { id: 'view_scheduled', name: 'عرض القراءات المجدولة' },
-  { id: 'add_scheduled', name: 'إضافة قراءة مجدولة' },
-  { id: 'edit_scheduled', name: 'تعديل قراءة مجدولة' },
-  { id: 'delete_scheduled', name: 'حذف قراءة مجدولة' },
+  { id: 'view_scheduled', name: 'عرض القراءات المجدولة', category: 'القراءات المجدولة' },
+  { id: 'add_scheduled', name: 'إضافة قراءة مجدولة', category: 'القراءات المجدولة' },
+  { id: 'edit_scheduled', name: 'تعديل قراءة مجدولة', category: 'القراءات المجدولة' },
+  { id: 'delete_scheduled', name: 'حذف قراءة مجدولة', category: 'القراءات المجدولة' },
 
   // Maintenance Permissions
-  { id: 'view_maintenance', name: 'عرض طلبات الصيانة' },
-  { id: 'add_maintenance', name: 'إضافة طلب صيانة' },
-  { id: 'edit_maintenance', name: 'تعديل طلب صيانة' },
-  { id: 'delete_maintenance', name: 'حذف طلب صيانة' },
-  { id: 'approve_maintenance_cost', name: 'اعتماد تكلفة الصيانة' },
+  { id: 'view_maintenance', name: 'عرض طلبات الصيانة', category: 'الصيانة' },
+  { id: 'add_maintenance', name: 'إضافة طلب صيانة', category: 'الصيانة' },
+  { id: 'edit_maintenance', name: 'تعديل طلب صيانة', category: 'الصيانة' },
+  { id: 'delete_maintenance', name: 'حذف طلب صيانة', category: 'الصيانة' },
+  { id: 'approve_maintenance_cost', name: 'اعتماد تكلفة الصيانة', category: 'الصيانة' },
 
   // Purchase Permissions
-  { id: 'view_purchase', name: 'عرض طلبات الشراء' },
-  { id: 'add_purchase', name: 'إضافة طلب شراء' },
-  { id: 'edit_purchase', name: 'تعديل طلب شراء' },
-  { id: 'delete_purchase', name: 'حذف طلب شراء' },
+  { id: 'view_purchase', name: 'عرض طلبات الشراء', category: 'المشتريات' },
+  { id: 'add_purchase', name: 'إضافة طلب شراء', category: 'المشتريات' },
+  { id: 'edit_purchase', name: 'تعديل طلب شراء', category: 'المشتريات' },
+  { id: 'delete_purchase', name: 'حذف طلب شراء', category: 'المشتريات' },
 
   // Car Handovers Permissions
-  { id: 'view_cars', name: 'عرض السيارات' },
-  { id: 'manage_cars', name: 'إدارة السيارات' },
-  { id: 'view_car_handovers', name: 'عرض عمليات استلام السيارات' },
-  { id: 'add_car_handovers', name: 'إضافة عملية استلام سيارة' },
+  { id: 'view_cars', name: 'عرض السيارات', category: 'السيارات' },
+  { id: 'manage_cars', name: 'إدارة السيارات', category: 'السيارات' },
+  { id: 'view_car_handovers', name: 'عرض عمليات استلام السيارات', category: 'السيارات' },
+  { id: 'add_car_handovers', name: 'إضافة عملية استلام سيارة', category: 'السيارات' },
 
   // Legacy/Other
-  { id: 'add_reports', name: 'إضافة التقارير والطلبات (عام)' },
-  { id: 'delete_reports', name: 'حذف التقارير (عام)' },
-  { id: 'manage_tickets', name: 'إدارة التذاكر (تغيير الحالة والحذف)' },
-  { id: 'approve_reports', name: 'مراجعة واعتماد التقارير' },
-  { id: 'view_maintenance_only', name: 'الاطلاع على طلبات الصيانة فقط' },
-  { id: 'view_inventory_only', name: 'الاطلاع على تقارير المخزون والاحتياج فقط' },
+  { id: 'add_reports', name: 'إضافة التقارير والطلبات (عام)', category: 'أخرى' },
+  { id: 'delete_reports', name: 'حذف التقارير (عام)', category: 'أخرى' },
+  { id: 'manage_tickets', name: 'إدارة التذاكر (تغيير الحالة والحذف)', category: 'أخرى' },
+  { id: 'approve_reports', name: 'مراجعة واعتماد التقارير', category: 'أخرى' },
+  { id: 'view_maintenance_only', name: 'الاطلاع على طلبات الصيانة فقط', category: 'أخرى' },
+  { id: 'view_inventory_only', name: 'الاطلاع على تقارير المخزون والاحتياج والهدر فقط', category: 'أخرى' },
 ];
 
 export interface CustomRole {

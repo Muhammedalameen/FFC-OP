@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Revenue from './pages/Revenue';
 import Inventory from './pages/Inventory';
 import NeedReport from './pages/NeedReport';
+import WasteReport from './pages/WasteReport';
 import Inspection from './pages/Inspection';
 import Tickets from './pages/Tickets';
 import TicketDetails from './pages/TicketDetails';
@@ -86,6 +87,7 @@ export default function App() {
               <Route path="revenue-reports" element={<RevenueReports />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="need-report" element={<NeedReport />} />
+              <Route path="waste-report" element={<WasteReport />} />
               <Route path="inspection" element={<Inspection />} />
               <Route path="scheduled-readings" element={<ScheduledReadings />} />
               <Route path="reports" element={<Reports />} />

@@ -26,7 +26,8 @@ import {
   CheckCircle2,
   Info,
   Download,
-  Car
+  Car,
+  Trash2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, subDays, parseISO } from 'date-fns';
@@ -108,7 +109,8 @@ export default function Layout() {
     { name: 'استلام السيارات', path: '/car-handovers', icon: Car, show: permissions.includes('view_car_handovers') || noUsers },
     { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') || noUsers },
     { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: permissions.includes('manage_system') || noUsers },
-    { name: 'طلبات التوريد', path: '/need-report', icon: AlertCircle, show: !permissions.includes('view_maintenance_only') || noUsers },
+    { name: 'طلبات التوريد', path: '/need-report', icon: AlertCircle, show: permissions.includes('view_need_report') || !permissions.includes('view_maintenance_only') || noUsers },
+    { name: 'تقارير الهدر', path: '/waste-report', icon: Trash2, show: permissions.includes('view_waste_report') || !permissions.includes('view_maintenance_only') || noUsers },
     { name: 'تقارير التشغيل', path: '/inspection', icon: ClipboardCheck, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
     { name: 'طلبات الصيانة', path: '/maintenance', icon: Wrench, show: !permissions.includes('view_inventory_only') || noUsers },
     { name: 'طلبات الشراء', path: '/purchase', icon: ShoppingCart, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
