@@ -43,7 +43,8 @@ export default function Admin() {
     type: 'number', 
     scheduledTimes: ['09:00'], 
     category: '',
-    requiredPhotosCount: 0
+    requiredPhotosCount: 0,
+    branchIds: []
   });
 
   // Copy Inventory State
@@ -156,7 +157,7 @@ export default function Admin() {
     } else {
       addScheduledReadingItem(newScheduledItem);
     }
-    setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTimes: ['09:00'], category: '', requiredPhotosCount: 0 });
+    setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTimes: ['09:00'], category: '', requiredPhotosCount: 0, branchIds: [] });
   };
 
   const handleEditScheduledItem = (item: ScheduledReadingItem) => {
@@ -618,6 +619,30 @@ export default function Admin() {
                 </div>
               </div>
 
+              <div className="md:col-span-2 lg:col-span-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">الفروع المخصصة (اتركه فارغاً لتطبيقه على جميع الفروع)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                  {branches.map(branch => (
+                    <label key={branch.id} className="flex items-center gap-2 p-2 border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={newScheduledItem.branchIds?.includes(branch.id) || false}
+                        onChange={(e) => {
+                          const currentIds = newScheduledItem.branchIds || [];
+                          if (e.target.checked) {
+                            setNewScheduledItem({...newScheduledItem, branchIds: [...currentIds, branch.id]});
+                          } else {
+                            setNewScheduledItem({...newScheduledItem, branchIds: currentIds.filter(id => id !== branch.id)});
+                          }
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-slate-300 truncate">{branch.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="md:col-span-2 lg:col-span-4 flex gap-2 mt-4">
                 <button 
                   type="submit" 
@@ -627,7 +652,7 @@ export default function Admin() {
                   <Plus size={18} /> {editingId ? 'حفظ التعديلات' : 'إضافة القراءة'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={() => { setEditingId(null); setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTimes: ['09:00'], category: '', requiredPhotosCount: 0 }); }} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white px-4 py-2 rounded-xl">إلغاء</button>
+                  <button type="button" onClick={() => { setEditingId(null); setNewScheduledItem({ name: '', unit: '', type: 'number', scheduledTimes: ['09:00'], category: '', requiredPhotosCount: 0, branchIds: [] }); }} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white px-4 py-2 rounded-xl">إلغاء</button>
                 )}
               </div>
             </form>
@@ -642,6 +667,7 @@ export default function Admin() {
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">النوع</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">الأوقات</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">التصنيف</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">الفروع</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400">الصور</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-slate-400 w-24">إجراء</th>
                     </tr>
@@ -666,6 +692,22 @@ export default function Admin() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.category}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {(!item.branchIds || item.branchIds.length === 0) ? (
+                            <span className="text-gray-500 dark:text-slate-400 text-xs">جميع الفروع</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1 max-w-[150px]">
+                              {item.branchIds.map(bid => {
+                                const branch = branches.find(b => b.id === bid);
+                                return branch ? (
+                                  <span key={bid} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded text-xs truncate max-w-full" title={branch.name}>
+                                    {branch.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                           {item.requiredPhotosCount ? (
                             <span className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-lg text-xs">

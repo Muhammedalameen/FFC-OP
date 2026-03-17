@@ -71,6 +71,11 @@ export default function Dashboard() {
       relevantBranches.forEach(branchId => {
         if (!branchId) return;
         scheduledReadingItems.forEach(item => {
+          // Check if this item applies to the current branch
+          if (item.branchIds && item.branchIds.length > 0 && !item.branchIds.includes(branchId)) {
+            return; // Skip this item for this branch
+          }
+
           const times = item.scheduledTimes || (item.scheduledTime ? [item.scheduledTime] : []);
           
           times.forEach(time => {

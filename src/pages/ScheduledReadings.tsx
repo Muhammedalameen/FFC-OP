@@ -49,6 +49,11 @@ export default function ScheduledReadings() {
   const scheduledTasks = useMemo(() => {
     const tasks: any[] = [];
     scheduledReadingItems.forEach(item => {
+      // Check if this item applies to the selected branch
+      if (item.branchIds && item.branchIds.length > 0 && !item.branchIds.includes(selectedBranchId)) {
+        return; // Skip this item for this branch
+      }
+
       const times = item.scheduledTimes || (item.scheduledTime ? [item.scheduledTime] : []);
       times.forEach(time => {
         tasks.push({ ...item, targetTime: time, taskKey: `${item.id}_${time}` });
@@ -56,7 +61,7 @@ export default function ScheduledReadings() {
     });
     tasks.sort((a, b) => a.targetTime.localeCompare(b.targetTime));
     return tasks;
-  }, [scheduledReadingItems]);
+  }, [scheduledReadingItems, selectedBranchId]);
 
   const handleImageUpload = async (taskKey: string, e: React.ChangeEvent<HTMLInputElement>, maxPhotos: number) => {
     const files = Array.from(e.target.files || []);

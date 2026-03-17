@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, ShiftRevenue } from '../store';
-import { Plus, Trash2, DollarSign, CreditCard, Truck, User, Download, Filter, Calendar, Building2, Save, FileText, Eye, Printer, X, Edit, FileEdit } from 'lucide-react';
+import { Plus, Trash2, DollarSign, CreditCard, Truck, User, Download, Filter, Calendar, Building2, Save, FileText, Eye, Printer, X, Edit, FileEdit, Camera, Image as ImageIcon } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
 import { getDefaultReportDate } from '../lib/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { compressImage } from '../lib/imageUtils';
 
 import { cn } from '../lib/utils';
 
@@ -54,7 +55,7 @@ export default function Revenue() {
 
   const handleShiftChange = (index: number, field: keyof Omit<ShiftRevenue, 'id'>, value: string) => {
     const newShifts = [...shifts];
-    if (field === 'employeeName') {
+    if (field === 'employeeName' || field === 'shiftReportImage') {
       newShifts[index][field] = value;
     } else {
       newShifts[index][field] = Number(value) || 0;
@@ -62,8 +63,34 @@ export default function Revenue() {
     setShifts(newShifts);
   };
 
+  const handleImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressedImage = await compressImage(file);
+        handleShiftChange(index, 'shiftReportImage', compressedImage);
+      } catch (error) {
+        console.error('Error compressing image:', error);
+        alert('حدث خطأ أثناء معالجة الصورة');
+      }
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    handleShiftChange(index, 'shiftReportImage', '');
+  };
+
   const saveReport = (status: 'draft' | 'pending') => {
     if (!branchId) return;
+
+    // Validate images for pending status
+    if (status === 'pending') {
+      const missingImages = shifts.findIndex(s => !s.shiftReportImage);
+      if (missingImages !== -1) {
+        alert(`الرجاء إرفاق صورة تقرير المناوبة للوردية رقم ${missingImages + 1}`);
+        return;
+      }
+    }
 
     if (editingReportId) {
       updateRevenueReport(editingReportId, {
@@ -378,6 +405,39 @@ export default function Revenue() {
                           />
                         </div>
                       </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800">
+                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                          <ImageIcon size={14} /> صورة تقرير المناوبة (إلزامي)
+                        </label>
+                        {shift.shiftReportImage ? (
+                          <div className="relative inline-block">
+                            <img src={shift.shiftReportImage} alt="تقرير المناوبة" className="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-slate-700" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center w-full md:w-64 h-32 border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Camera className="w-8 h-8 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-500 dark:text-slate-400 font-bold">التقاط صورة التقرير</p>
+                              <p className="text-xs text-gray-400 mt-1">من كاميرا الجوال فقط</p>
+                            </div>
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*" 
+                              capture="environment"
+                              onChange={(e) => handleImageUpload(index, e)}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -600,6 +660,13 @@ export default function Revenue() {
                           <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{(shift.cash + shift.pos + shift.delivery).toLocaleString()} ر.س</p>
                         </div>
                       </div>
+                      {shift.shiftReportImage && (
+                        <div className="mt-4 md:mt-0 md:mr-4 shrink-0">
+                          <a href={shift.shiftReportImage} target="_blank" rel="noopener noreferrer" className="block">
+                            <img src={shift.shiftReportImage} alt="تقرير المناوبة" className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-slate-700 hover:opacity-80 transition-opacity" />
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

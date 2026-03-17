@@ -222,6 +222,7 @@ export interface ShiftRevenue {
   pos: number;
   delivery: number;
   employeeName: string;
+  shiftReportImage?: string;
 }
 
 export interface RevenueReport {
@@ -284,6 +285,7 @@ export interface ScheduledReadingItem {
   scheduledTimes?: string[]; // Array of HH:mm times
   category: string;
   requiredPhotosCount?: number; // Number of photos required for this reading
+  branchIds?: string[]; // Array of branch IDs this reading applies to
 }
 
 export interface ReadingRecord {
