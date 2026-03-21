@@ -114,6 +114,13 @@ export default function Inventory() {
   const saveReport = (status: 'draft' | 'pending') => {
     if (!branchId) return;
 
+    // Check if a report already exists for this date and branch
+    const existingReport = inventoryReports.find(r => r.branchId === branchId && r.date === date && r.id !== editingReportId);
+    if (existingReport) {
+      alert('عذراً، يوجد تقرير جرد مسجل مسبقاً لهذا الفرع في نفس التاريخ (حتى لو كان مسودة). لا يمكن إضافة أكثر من تقرير لنفس اليوم.');
+      return;
+    }
+
     // Validation: Check for negative consumption
     const hasNegativeConsumption = items.some(item => item.consumption < 0);
     if (hasNegativeConsumption) {

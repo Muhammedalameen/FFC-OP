@@ -83,6 +83,13 @@ export default function Revenue() {
   const saveReport = (status: 'draft' | 'pending') => {
     if (!branchId) return;
 
+    // Check if a report already exists for this date and branch
+    const existingReport = revenueReports.find(r => r.branchId === branchId && r.date === date && r.id !== editingReportId);
+    if (existingReport) {
+      alert('عذراً، يوجد تقرير إيرادات مسجل مسبقاً لهذا الفرع في نفس التاريخ (حتى لو كان مسودة). لا يمكن إضافة أكثر من تقرير لنفس اليوم.');
+      return;
+    }
+
     // Validate images for pending status
     if (status === 'pending') {
       const missingImages = shifts.findIndex(s => !s.shiftReportImage);
