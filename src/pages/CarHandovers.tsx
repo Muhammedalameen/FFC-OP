@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { Plus, Search, Car, Calendar, User, FileText, Eye, Trash2, Gauge, Fuel, Printer, ArrowLeftRight, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays, differenceInHours, differenceInMinutes } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { arSA } from 'date-fns/locale';
 
 export default function CarHandovers() {
   const { carHandovers, cars, users, currentUser, customRoles, deleteCarHandover } = useStore();
@@ -167,12 +167,12 @@ export default function CarHandovers() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar size={16} className="text-gray-400" />
-                    <span>{format(parseISO(handover.createdAt), 'dd MMMM yyyy - hh:mm a', { locale: ar })}</span>
+                    <span>{format(parseISO(handover.createdAt), 'dd MMMM yyyy - hh:mm a', { locale: arSA })}</span>
                   </div>
                   {handover.expectedReturnDate && (
                     <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
                       <Calendar size={16} />
-                      <span>متوقع التسليم: {format(parseISO(handover.expectedReturnDate), 'dd MMMM yyyy', { locale: ar })}</span>
+                      <span>متوقع التسليم: {format(parseISO(handover.expectedReturnDate), 'dd MMMM yyyy', { locale: arSA })}</span>
                     </div>
                   )}
                   {handover.status === 'closed' && handover.returnDate && (
@@ -240,7 +240,7 @@ export default function CarHandovers() {
               <div className="hidden print:block text-center border-b-2 border-gray-800 pb-4 mb-6">
                 <h2 className="text-2xl font-bold mb-2">تقرير استلام مركبة</h2>
                 <p className="text-gray-600">رقم المرجع: {selectedHandover.referenceNumber}</p>
-                <p className="text-gray-600">تاريخ التقرير: {format(new Date(), 'dd MMMM yyyy', { locale: ar })}</p>
+                <p className="text-gray-600">تاريخ التقرير: {format(new Date(), 'dd MMMM yyyy', { locale: arSA })}</p>
               </div>
 
               {/* Info Grid */}
@@ -263,14 +263,14 @@ export default function CarHandovers() {
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">تاريخ الاستلام</p>
                   <p className="font-bold text-gray-800 dark:text-white">
-                    {format(parseISO(selectedHandover.createdAt), 'dd MMMM yyyy - hh:mm a', { locale: ar })}
+                    {format(parseISO(selectedHandover.createdAt), 'dd MMMM yyyy - hh:mm a', { locale: arSA })}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">موعد التسليم المتوقع</p>
                   <p className="font-bold text-gray-800 dark:text-white">
                     {selectedHandover.expectedReturnDate 
-                      ? format(parseISO(selectedHandover.expectedReturnDate), 'dd MMMM yyyy', { locale: ar })
+                      ? format(parseISO(selectedHandover.expectedReturnDate), 'dd MMMM yyyy', { locale: arSA })
                       : 'غير محدد'}
                   </p>
                 </div>
@@ -357,7 +357,7 @@ export default function CarHandovers() {
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">تاريخ التسليم</p>
                       <p className="font-bold text-gray-800 dark:text-white">
-                        {selectedHandover.returnDate ? format(parseISO(selectedHandover.returnDate), 'dd MMMM yyyy - hh:mm a', { locale: ar }) : 'غير متوفر'}
+                        {selectedHandover.returnDate ? format(parseISO(selectedHandover.returnDate), 'dd MMMM yyyy - hh:mm a', { locale: arSA }) : 'غير متوفر'}
                       </p>
                     </div>
                     <div>

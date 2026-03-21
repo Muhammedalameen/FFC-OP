@@ -15,7 +15,7 @@ import {
   X
 } from 'lucide-react';
 import { format, parse, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { arSA } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -64,7 +64,7 @@ export default function ScheduledReadings() {
   }, [scheduledReadingItems, selectedBranchId]);
 
   const handleImageUpload = async (taskKey: string, e: React.ChangeEvent<HTMLInputElement>, maxPhotos: number) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []) as File[];
     if (files.length > 0) {
       const currentImages = tempImages[taskKey] || [];
       const remainingSlots = maxPhotos > 0 ? maxPhotos - currentImages.length : 1; // Default to 1 if not specified
@@ -146,7 +146,7 @@ export default function ScheduledReadings() {
           </button>
           <div className="flex items-center gap-2 px-4 font-medium min-w-[150px] justify-center">
             <CalendarIcon size={18} className="text-blue-600" />
-            {format(selectedDate, 'EEEE, d MMMM', { locale: ar })}
+            {format(selectedDate, 'EEEE, d MMMM', { locale: arSA })}
           </div>
           <button 
             onClick={() => setSelectedDate(prev => new Date(prev.setDate(prev.getDate() + 1)))}

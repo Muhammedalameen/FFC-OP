@@ -382,7 +382,7 @@ export default function Revenue() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={shift.cash || ''}
+                            value={shift.cash === 0 ? '0' : (shift.cash || '')}
                             onChange={(e) => handleShiftChange(index, 'cash', e.target.value)}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
@@ -394,7 +394,7 @@ export default function Revenue() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={shift.pos || ''}
+                            value={shift.pos === 0 ? '0' : (shift.pos || '')}
                             onChange={(e) => handleShiftChange(index, 'pos', e.target.value)}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
@@ -406,7 +406,7 @@ export default function Revenue() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={shift.delivery || ''}
+                            value={shift.delivery === 0 ? '0' : (shift.delivery || '')}
                             onChange={(e) => handleShiftChange(index, 'delivery', e.target.value)}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
