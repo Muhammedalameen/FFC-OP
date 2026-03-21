@@ -135,6 +135,7 @@ export default function Revenue() {
   };
 
   const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_revenue');
+  const canEdit = userRole?.permissions.includes('edit_reports') || userRole?.permissions.includes('edit_revenue') || canAdd;
   const canDelete = userRole?.permissions.includes('delete_reports') || userRole?.permissions.includes('delete_revenue');
 
   const filteredReports = revenueReports.filter(r => {
@@ -490,7 +491,7 @@ export default function Revenue() {
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">إجمالي التوصيل</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الإجمالي الكلي</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الحالة</th>
-                {canDelete && <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">إجراء</th>}
+                {(canDelete || canEdit) && <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">إجراء</th>}
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">عرض</th>
               </tr>
             </thead>
@@ -538,16 +539,18 @@ export default function Revenue() {
                          report.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
                       </span>
                     </td>
-                    {canDelete && (
+                    {(canDelete || canEdit) && (
                       <td className="px-6 py-4 text-sm flex items-center gap-2">
-                        {report.status === 'draft' && (
+                        {report.status === 'draft' && canEdit && (
                           <button onClick={() => handleEditReport(report)} className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
                             <Edit size={18} />
                           </button>
                         )}
-                        <button onClick={() => handleDeleteReport(report)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
-                          <Trash2 size={18} />
-                        </button>
+                        {canDelete && (
+                          <button onClick={() => handleDeleteReport(report)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </td>
                     )}
                     <td className="px-6 py-4 text-sm">

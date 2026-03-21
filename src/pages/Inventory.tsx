@@ -42,6 +42,7 @@ export default function Inventory() {
   const canViewAll = permissions.includes('view_all_branches');
   const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
   const canAdd = (permissions.includes('add_reports') || permissions.includes('add_inventory')) && !permissions.includes('view_inventory_only');
+  const canEdit = (permissions.includes('edit_reports') || permissions.includes('edit_inventory') || canAdd) && !permissions.includes('view_inventory_only');
   const canDelete = (permissions.includes('delete_reports') || permissions.includes('delete_inventory')) && !permissions.includes('view_inventory_only');
 
   // Filter State
@@ -544,7 +545,7 @@ export default function Inventory() {
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الفرع</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">عدد الأصناف</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400">الحالة</th>
-                {canDelete && <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">إجراء</th>}
+                {(canDelete || canEdit) && <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">إجراء</th>}
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 dark:text-slate-400 w-20">عرض</th>
               </tr>
             </thead>
@@ -575,16 +576,18 @@ export default function Inventory() {
                          report.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
                       </span>
                     </td>
-                    {canDelete && (
+                    {(canDelete || canEdit) && (
                       <td className="px-6 py-4 text-sm flex items-center gap-2">
-                        {report.status === 'draft' && (
+                        {report.status === 'draft' && canEdit && (
                           <button onClick={() => handleEditReport(report)} className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
                             <Edit size={18} />
                           </button>
                         )}
-                        <button onClick={() => handleDeleteReport(report)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
-                          <Trash2 size={18} />
-                        </button>
+                        {canDelete && (
+                          <button onClick={() => handleDeleteReport(report)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </td>
                     )}
                     <td className="px-6 py-4 text-sm">
