@@ -451,16 +451,16 @@ export default function Inventory() {
                           <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{invItem.category}</td>
                           <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{invItem.unit}</td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.01" value={item.opening ?? ''} onChange={(e) => handleItemChange(index, 'opening', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.opening ?? ''} onChange={(e) => handleItemChange(index, 'opening', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.01" value={item.received ?? ''} onChange={(e) => handleItemChange(index, 'received', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.received ?? ''} onChange={(e) => handleItemChange(index, 'received', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.01" value={item.waste ?? ''} onChange={(e) => handleItemChange(index, 'waste', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.waste ?? ''} onChange={(e) => handleItemChange(index, 'waste', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.01" value={item.closing ?? ''} onChange={(e) => handleItemChange(index, 'closing', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.closing ?? ''} onChange={(e) => handleItemChange(index, 'closing', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
                             <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-xl px-2 py-1 text-sm text-gray-700 dark:text-slate-300 font-bold text-center">
@@ -472,7 +472,7 @@ export default function Inventory() {
                               <input 
                                 type="number" 
                                 min="0" 
-                                step="0.01" 
+                                step="0.001" 
                                 value={item.need ?? ''} 
                                 onChange={(e) => handleItemChange(index, 'need', e.target.value)} 
                                 className={cn(

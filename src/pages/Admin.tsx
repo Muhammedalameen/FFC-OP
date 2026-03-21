@@ -1033,6 +1033,24 @@ export default function Admin() {
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                     {Object.entries(syncStatuses).map(([collection, info]) => {
+                      const collectionNamesAr: Record<string, string> = {
+                        users: 'المستخدمين',
+                        customRoles: 'الصلاحيات المخصصة',
+                        branches: 'الفروع',
+                        cars: 'السيارات',
+                        inventoryItems: 'أصناف المخزون',
+                        operationalItems: 'بنود التشغيل',
+                        revenueReports: 'تقارير الإيرادات',
+                        inventoryReports: 'تقارير المخزون والاحتياج والهدر',
+                        inspectionReports: 'تقارير التشغيل',
+                        scheduledReadingItems: 'بنود القراءات المجدولة',
+                        readingRecords: 'سجلات القراءات',
+                        tickets: 'طلبات الصيانة والشراء',
+                        carHandovers: 'استلام وتسليم السيارات'
+                      };
+                      
+                      const arName = collectionNamesAr[collection] || collection;
+
                       let StatusIcon = Clock3;
                       let statusColor = 'text-gray-500';
                       let statusBg = 'bg-gray-100 dark:bg-gray-800';
@@ -1068,7 +1086,10 @@ export default function Admin() {
                       return (
                         <tr key={collection} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                           <td className="px-6 py-4">
-                            <span className="font-medium text-gray-900 dark:text-white">{collection}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900 dark:text-white">{arName}</span>
+                              <span className="text-xs text-gray-500 dark:text-slate-400" dir="ltr">{collection}</span>
+                            </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusBg} ${statusColor}`}>
