@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useStore } from '../store';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useStore, initFirebaseSync } from '../store';
 import { 
   ClipboardCheck, 
   Clock, 
@@ -30,6 +30,10 @@ export default function ScheduledReadings() {
     branches,
     customRoles
   } = useStore();
+
+  useEffect(() => {
+    initFirebaseSync(['scheduledReadingItems', 'readingRecords']);
+  }, []);
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');

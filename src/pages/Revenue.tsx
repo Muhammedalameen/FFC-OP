@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, ShiftRevenue } from '../store';
+import { useStore, ShiftRevenue, initFirebaseSync } from '../store';
 import { Plus, Trash2, DollarSign, CreditCard, Truck, User, Download, Filter, Calendar, Building2, Save, FileText, Eye, Printer, X, Edit, FileEdit, Camera, Image as ImageIcon } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
-import { getDefaultReportDate } from '../lib/dateUtils';
+import { getDefaultReportDate, getDefaultFilterRange } from '../lib/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { compressImage } from '../lib/imageUtils';
 
@@ -11,6 +11,10 @@ import { cn } from '../lib/utils';
 
 export default function Revenue() {
   const { currentUser, customRoles, branches, revenueReports, addRevenueReport, updateRevenueReport, deleteRevenueReport, addNotification, restoreRevenueReport } = useStore();
+
+  useEffect(() => {
+    initFirebaseSync(['revenueReports']);
+  }, []);
   const [isAdding, setIsAdding] = useState(false);
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -25,10 +29,7 @@ export default function Revenue() {
   const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
 
   // Filter State
-  const [filterDate, setFilterDate] = useState({
-    start: format(new Date(), 'yyyy-MM-01'),
-    end: format(new Date(), 'yyyy-MM-dd')
-  });
+  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   // Load report data when editing

@@ -3,7 +3,7 @@ import { useStore, InspectionReportItem } from '../store';
 import { Plus, Trash2, Save, CheckCircle, XCircle, MinusCircle, Calendar, Building2, Download, Filter } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF } from '../lib/exportUtils';
-import { getDefaultReportDate } from '../lib/dateUtils';
+import { getDefaultReportDate, getDefaultFilterRange } from '../lib/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Inspection() {
@@ -20,10 +20,7 @@ export default function Inspection() {
   const canDelete = userRole?.permissions.includes('delete_reports');
 
   // Filter State
-  const [filterDate, setFilterDate] = useState({
-    start: format(new Date(), 'yyyy-MM-01'),
-    end: format(new Date(), 'yyyy-MM-dd')
-  });
+  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   useEffect(() => {

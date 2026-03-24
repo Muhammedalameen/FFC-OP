@@ -11,3 +11,12 @@ export const getDefaultReportDate = () => {
   
   return format(now, 'yyyy-MM-dd');
 };
+
+export const getDefaultFilterRange = () => {
+  const today = new Date();
+  const yesterday = subDays(today, 1);
+  return {
+    start: format(yesterday, 'yyyy-MM-dd'),
+    end: format(today, 'yyyy-MM-dd')
+  };
+};

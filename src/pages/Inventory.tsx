@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, InventoryReportItem } from '../store';
+import { useStore, InventoryReportItem, initFirebaseSync } from '../store';
 import { Plus, Trash2, Save, Download, Filter, Calendar, Building2, Package, AlertTriangle, Eye, Printer, X, FileText, Edit, FileEdit } from 'lucide-react';
 import { format, subDays, isWithinInterval, parseISO, isAfter } from 'date-fns';
 import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
-import { getDefaultReportDate } from '../lib/dateUtils';
+import { getDefaultReportDate, getDefaultFilterRange } from '../lib/dateUtils';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Inventory() {
   const { currentUser, customRoles, branches, inventoryItems, inventoryReports, addInventoryReport, updateInventoryReport, deleteInventoryReport, addNotification, restoreInventoryReport } = useStore();
+
+  useEffect(() => {
+    initFirebaseSync(['inventoryItems', 'inventoryReports']);
+  }, []);
   const [isAdding, setIsAdding] = useState(false);
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -46,10 +50,7 @@ export default function Inventory() {
   const canDelete = (permissions.includes('delete_reports') || permissions.includes('delete_inventory')) && !permissions.includes('view_inventory_only');
 
   // Filter State
-  const [filterDate, setFilterDate] = useState({
-    start: format(new Date(), 'yyyy-MM-01'),
-    end: format(new Date(), 'yyyy-MM-dd')
-  });
+  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   // Load items for the selected branch or when editing

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { useStore, Ticket } from '../store';
+import React, { useState, useEffect } from 'react';
+import { useStore, Ticket, initFirebaseSync } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, MessageSquare, Image as ImageIcon, Paperclip, Calendar, Building2, Search, Filter, AlertCircle, Package, DollarSign } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
+import { getDefaultFilterRange } from '../lib/dateUtils';
 
 import { compressImage } from '../lib/imageUtils';
 
@@ -13,6 +14,10 @@ interface TicketsProps {
 export default function Tickets({ type }: TicketsProps) {
   const navigate = useNavigate();
   const { currentUser, customRoles, branches, users, tickets, addTicket, updateTicketStatus, addTicketComment, deleteTicket } = useStore();
+
+  useEffect(() => {
+    initFirebaseSync(['tickets']);
+  }, []);
   const [isAdding, setIsAdding] = useState(false);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
@@ -40,10 +45,7 @@ export default function Tickets({ type }: TicketsProps) {
   const canDelete = (permissions.includes('delete_reports') || permissions.includes(`delete_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
 
   // Filter State
-  const [filterDate, setFilterDate] = useState({
-    start: format(new Date(), 'yyyy-MM-01'),
-    end: format(new Date(), 'yyyy-MM-dd')
-  });
+  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
   const [searchTerm, setSearchTerm] = useState('');
 

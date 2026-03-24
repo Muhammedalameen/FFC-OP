@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem } from '../store';
+import React, { useState, useRef, useEffect } from 'react';
+import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem, initFirebaseSync } from '../store';
 import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car, Activity, CheckCircle2, XCircle, Loader2, Clock3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Cars from './admin/Cars';
@@ -15,6 +15,10 @@ export default function Admin() {
     scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem,
     syncStatuses
   } = useStore();
+
+  useEffect(() => {
+    initFirebaseSync(['inventoryItems', 'operationalItems', 'scheduledReadingItems', 'cars']);
+  }, []);
 
   const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled' | 'cars' | 'sync'>('users');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);

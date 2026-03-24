@@ -1,18 +1,20 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, initFirebaseSync } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { Activity, DollarSign, Package, Wrench, Calendar, Building2, Filter, Clock, CheckCircle2, AlertCircle, User } from 'lucide-react';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
+import { getDefaultFilterRange } from '../lib/dateUtils';
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
   const { currentUser, customRoles, branches, revenueReports, inventoryReports, tickets, scheduledReadingItems, readingRecords, users } = useStore();
+
+  useEffect(() => {
+    initFirebaseSync(['revenueReports', 'inventoryReports', 'tickets', 'scheduledReadingItems', 'readingRecords']);
+  }, []);
   const navigate = useNavigate();
   
-  const [dateRange, setDateRange] = useState({
-    start: startOfWeek(new Date(), { weekStartsOn: 6 }).toISOString().split('T')[0],
-    end: endOfWeek(new Date(), { weekStartsOn: 6 }).toISOString().split('T')[0]
-  });
+  const [dateRange, setDateRange] = useState(getDefaultFilterRange());
   const [selectedBranch, setSelectedBranch] = useState('all');
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);

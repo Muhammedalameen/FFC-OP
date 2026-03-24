@@ -15,44 +15,62 @@ let isFirebaseInitialized = false;
 const firebaseLoadedCollections = new Set<string>();
 let isReceivingFromFirebase = false;
 
-let unsubscribeFunctions: (() => void)[] = [];
+let activeListeners: Record<string, () => void> = {};
 let isLocalListenerInitialized = false;
 
-export const initFirebaseSync = async () => {
-  // Unsubscribe from previous listeners
-  unsubscribeFunctions.forEach(unsub => unsub());
-  unsubscribeFunctions = [];
-  
+export const GLOBAL_COLLECTIONS = ['users', 'customRoles', 'branches'];
+
+export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLLECTIONS) => {
   const state = useStore.getState();
   const currentUser = state.currentUser;
   
-  // 1. Migration & Initial push
-  for (const col of COLLECTIONS_TO_SYNC) {
-    const oldDocRef = doc(db, 'system_data', col);
-    try {
-      const docSnap = await getDoc(oldDocRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data().data;
-        if (Array.isArray(data)) {
-          await Promise.all(data.map((item: any) => setDoc(doc(db, col, item.id), item)));
-          await deleteDoc(oldDocRef);
-          console.log(`Migrated ${col} to new structure`);
+  // 1. Migration & Initial push (only once for the whole system)
+  if (!isFirebaseInitialized) {
+    for (const col of COLLECTIONS_TO_SYNC) {
+      const oldDocRef = doc(db, 'system_data', col);
+      try {
+        const docSnap = await getDoc(oldDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data().data;
+          if (Array.isArray(data)) {
+            await Promise.all(data.map((item: any) => setDoc(doc(db, col, item.id), item)));
+            await deleteDoc(oldDocRef);
+            console.log(`Migrated ${col} to new structure`);
+          }
+        } else {
+          const colRef = collection(db, col);
+          const snap = await getDocs(query(colRef, limit(1)));
+          const localData = state[col as keyof AppState];
+          if (snap.empty && Array.isArray(localData) && localData.length > 0) {
+            await Promise.all(localData.map((item: any) => setDoc(doc(db, col, item.id), item)));
+          }
         }
-      } else {
-        const colRef = collection(db, col);
-        const snap = await getDocs(query(colRef, limit(1)));
-        const localData = state[col as keyof AppState];
-        if (snap.empty && Array.isArray(localData) && localData.length > 0) {
-          await Promise.all(localData.map((item: any) => setDoc(doc(db, col, item.id), item)));
-        }
+      } catch (e) {
+        console.error(`Error initializing ${col}:`, e);
       }
-    } catch (e) {
-      console.error(`Error initializing ${col}:`, e);
     }
+    isFirebaseInitialized = true;
   }
 
-  // 2. Listen to Firebase changes (Real-time sync)
-  COLLECTIONS_TO_SYNC.forEach(col => {
+  // 2. Unsubscribe from collections no longer needed
+  // We keep GLOBAL_COLLECTIONS always active if user is logged in
+  const requiredCollections = currentUser 
+    ? [...new Set([...GLOBAL_COLLECTIONS, ...targetCollections])]
+    : [];
+
+  Object.keys(activeListeners).forEach(col => {
+    if (!requiredCollections.includes(col)) {
+      activeListeners[col]();
+      delete activeListeners[col];
+      firebaseLoadedCollections.delete(col);
+      console.log(`Unsubscribed from ${col}`);
+    }
+  });
+
+  // 3. Listen to Firebase changes (Real-time sync)
+  requiredCollections.forEach(col => {
+    if (activeListeners[col]) return; // Already subscribed
+
     const colRef = collection(db, col);
     let q = query(colRef);
     
@@ -73,6 +91,20 @@ export const initFirebaseSync = async () => {
       
       firebaseLoadedCollections.add(col);
       
+      // Single session check for users collection
+      if (col === 'users') {
+        const state = useStore.getState();
+        if (state.currentUser) {
+          const remoteUser = remoteData.find((u: any) => u.id === state.currentUser?.id);
+          if (remoteUser && remoteUser.sessionId && remoteUser.sessionId !== state.currentSessionId) {
+            // New session detected elsewhere
+            state.logout();
+            state.addNotification('تم تسجيل الدخول من جهاز آخر، تم تسجيل خروجك تلقائياً', 'info');
+            return;
+          }
+        }
+      }
+      
       if (JSON.stringify(remoteData) !== JSON.stringify(localData)) {
         isReceivingFromFirebase = true;
         useStore.setState({ [col]: remoteData } as any);
@@ -82,7 +114,8 @@ export const initFirebaseSync = async () => {
       console.error(`Error listening to ${col}:`, error);
     });
     
-    unsubscribeFunctions.push(unsub);
+    activeListeners[col] = unsub;
+    console.log(`Subscribed to ${col}`);
   });
 
   // 3. Listen to local changes and push to Firebase
@@ -198,6 +231,7 @@ export interface User {
   name: string;
   roleId: string;
   branchId?: string;
+  sessionId?: string;
 }
 
 export interface Branch {
@@ -417,6 +451,7 @@ interface AppState {
   cars: Car[];
   carHandovers: CarHandover[];
   currentUser: User | null;
+  currentSessionId: string | null;
   theme: 'light' | 'dark' | 'system';
   notifications: Notification[];
   isDbConnected: boolean | null;
@@ -584,6 +619,23 @@ export const useStore = create<AppState>()(
         }
         return null;
       })(),
+      currentSessionId: (() => {
+        const sid = sessionStorage.getItem('restaurant_session_id');
+        if (sid) return sid;
+        
+        // If not in sessionStorage, try to get it from the saved user in localStorage
+        try {
+          const savedUser = localStorage.getItem('restaurant_session_user');
+          if (savedUser) {
+            const user = JSON.parse(savedUser);
+            if (user.sessionId) {
+              sessionStorage.setItem('restaurant_session_id', user.sessionId);
+              return user.sessionId;
+            }
+          }
+        } catch (e) {}
+        return null;
+      })(),
       theme: 'system',
       notifications: [],
       isDbConnected: null,
@@ -620,23 +672,37 @@ export const useStore = create<AppState>()(
       login: (employeeId, pin, rememberMe) => {
         const user = get().users.find(u => u.employeeId === employeeId && u.pin === pin);
         if (user) {
-          set({ currentUser: user });
+          const sessionId = generateId();
+          const updatedUser = { ...user, sessionId };
+          
+          set({ 
+            currentUser: updatedUser,
+            currentSessionId: sessionId
+          });
+          
+          sessionStorage.setItem('restaurant_session_id', sessionId);
+
           if (rememberMe) {
             localStorage.setItem('restaurant_remember_me', 'true');
-            localStorage.setItem('restaurant_session_user', JSON.stringify(user));
+            localStorage.setItem('restaurant_session_user', JSON.stringify(updatedUser));
           } else {
             localStorage.removeItem('restaurant_remember_me');
             localStorage.removeItem('restaurant_session_user');
           }
+          
+          // Update user in Firestore immediately to invalidate other sessions
+          setDoc(doc(db, 'users', user.id), updatedUser);
+          
           initFirebaseSync();
           return true;
         }
         return false;
       },
       logout: () => {
-        set({ currentUser: null });
+        set({ currentUser: null, currentSessionId: null });
         localStorage.removeItem('restaurant_remember_me');
         localStorage.removeItem('restaurant_session_user');
+        sessionStorage.removeItem('restaurant_session_id');
         initFirebaseSync();
       },
       setTheme: (theme) => set({ theme }),

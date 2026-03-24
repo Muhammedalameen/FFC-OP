@@ -6,6 +6,7 @@ import {
   startOfYear, endOfYear, isAfter, isBefore, parseISO, isWithinInterval,
   subWeeks, subMonths, subYears, startOfDay, endOfDay
 } from 'date-fns';
+import { getDefaultFilterRange } from '../lib/dateUtils';
 import { printReport } from '../lib/exportUtils';
 import { cn } from '../lib/utils';
 
@@ -18,14 +19,14 @@ export default function Reports() {
   // Applied Filters
   const [appliedProduct, setAppliedProduct] = useState<string>('all');
   const [appliedBranches, setAppliedBranches] = useState<string[]>(canViewAll ? ['all'] : [currentUser?.branchId || '']);
-  const [appliedDateFilter, setAppliedDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
-  const [appliedCustomRange, setAppliedCustomRange] = useState({ start: '', end: '' });
+  const [appliedDateFilter, setAppliedDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('custom');
+  const [appliedCustomRange, setAppliedCustomRange] = useState(getDefaultFilterRange());
 
   // Temporary State
   const [tempProduct, setTempProduct] = useState<string>('all');
   const [tempBranches, setTempBranches] = useState<string[]>(canViewAll ? ['all'] : [currentUser?.branchId || '']);
-  const [tempDateFilter, setTempDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('thisMonth');
-  const [tempCustomRange, setTempCustomRange] = useState({ start: '', end: '' });
+  const [tempDateFilter, setTempDateFilter] = useState<'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'>('custom');
+  const [tempCustomRange, setTempCustomRange] = useState(getDefaultFilterRange());
 
   const dateRange = useMemo(() => {
     const now = new Date();
