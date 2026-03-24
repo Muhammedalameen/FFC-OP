@@ -272,6 +272,7 @@ export interface Car {
   name: string;
   model: string;
   plateNumber: string;
+  branchId?: string; // Optional: car can be assigned to a branch
 }
 
 export interface CarHandover {
@@ -336,6 +337,7 @@ export interface RevenueReport {
   createdBy: string;
   createdAt: string;
   images?: string[];
+  notes?: string;
   status: 'draft' | 'approved' | 'rejected' | 'pending';
 }
 

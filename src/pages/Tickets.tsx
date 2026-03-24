@@ -15,6 +15,8 @@ export default function Tickets({ type }: TicketsProps) {
   const navigate = useNavigate();
   const { currentUser, customRoles, branches, users, tickets, addTicket, updateTicketStatus, addTicketComment, deleteTicket } = useStore();
 
+  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
+
   useEffect(() => {
     initFirebaseSync(['tickets'], filterDate);
   }, [filterDate]);
@@ -45,7 +47,6 @@ export default function Tickets({ type }: TicketsProps) {
   const canDelete = (permissions.includes('delete_reports') || permissions.includes(`delete_${permissionType}`)) && !permissions.includes(`view_${permissionType}_only`);
 
   // Filter State
-  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
   const [searchTerm, setSearchTerm] = useState('');
 
