@@ -58,7 +58,8 @@ export default function Revenue() {
     if (field === 'employeeName' || field === 'shiftReportImage') {
       newShifts[index][field] = value;
     } else {
-      newShifts[index][field] = Number(value) || 0;
+      // Allow empty string or numbers
+      (newShifts[index][field] as any) = value === '' ? '' : Number(value);
     }
     setShifts(newShifts);
   };
@@ -103,14 +104,26 @@ export default function Revenue() {
       updateRevenueReport(editingReportId, {
         branchId,
         date,
-        shifts: shifts.map(s => ({ ...s, id: s.id || Math.random().toString(36).substring(2, 9) })),
+        shifts: shifts.map(s => ({ 
+          ...s, 
+          id: (s as any).id || Math.random().toString(36).substring(2, 9),
+          cash: Number(s.cash) || 0,
+          pos: Number(s.pos) || 0,
+          delivery: Number(s.delivery) || 0
+        })),
         status
       });
     } else {
       addRevenueReport({
         branchId,
         date,
-        shifts: shifts.map(s => ({ ...s, id: Math.random().toString(36).substring(2, 9) })),
+        shifts: shifts.map(s => ({ 
+          ...s, 
+          id: Math.random().toString(36).substring(2, 9),
+          cash: Number(s.cash) || 0,
+          pos: Number(s.pos) || 0,
+          delivery: Number(s.delivery) || 0
+        })),
         createdBy: currentUser!.id,
         status
       });
@@ -382,8 +395,9 @@ export default function Revenue() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={shift.cash === 0 ? '0' : (shift.cash || '')}
+                            value={shift.cash === '' ? '' : shift.cash}
                             onChange={(e) => handleShiftChange(index, 'cash', e.target.value)}
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
                           />
@@ -394,8 +408,9 @@ export default function Revenue() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={shift.pos === 0 ? '0' : (shift.pos || '')}
+                            value={shift.pos === '' ? '' : shift.pos}
                             onChange={(e) => handleShiftChange(index, 'pos', e.target.value)}
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
                           />
@@ -406,8 +421,9 @@ export default function Revenue() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={shift.delivery === 0 ? '0' : (shift.delivery || '')}
+                            value={shift.delivery === '' ? '' : shift.delivery}
                             onChange={(e) => handleShiftChange(index, 'delivery', e.target.value)}
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
                           />

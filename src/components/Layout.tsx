@@ -83,6 +83,68 @@ export default function Layout() {
     navigate('/login');
   };
 
+  const [showIdleWarning, setShowIdleWarning] = useState(false);
+  const [idleTimeLeft, setIdleTimeLeft] = useState(60);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    const WARNING_TIME = 1 * 60 * 1000; // 1 minute warning
+
+    let timeoutId: NodeJS.Timeout;
+    let warningId: NodeJS.Timeout;
+    let countdownId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      clearTimeout(warningId);
+      clearInterval(countdownId);
+      setShowIdleWarning(false);
+      setIdleTimeLeft(60);
+
+      warningId = setTimeout(() => {
+        setShowIdleWarning(true);
+        let timeLeft = 60;
+        countdownId = setInterval(() => {
+          timeLeft -= 1;
+          setIdleTimeLeft(timeLeft);
+          if (timeLeft <= 0) {
+            clearInterval(countdownId);
+          }
+        }, 1000);
+      }, IDLE_TIMEOUT - WARNING_TIME);
+
+      timeoutId = setTimeout(() => {
+        handleLogout();
+      }, IDLE_TIMEOUT);
+    };
+
+    const handleActivity = () => {
+      // Only reset if we are not already showing the warning,
+      // or if we are showing it, maybe we want user to explicitly click "Continue"
+      // Actually, any activity should reset the timer.
+      resetTimer();
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    
+    events.forEach(event => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    resetTimer();
+
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+      clearTimeout(timeoutId);
+      clearTimeout(warningId);
+      clearInterval(countdownId);
+    };
+  }, [currentUser]);
+
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -534,6 +596,24 @@ export default function Layout() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Idle Warning Modal */}
+      {showIdleWarning && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200 text-center">
+            <AlertCircle size={48} className="mx-auto text-amber-500 mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">تنبيه خمول</h2>
+            <p className="text-gray-600 dark:text-slate-400 mb-6">
+              سيتم تسجيل خروجك تلقائياً بعد <span className="font-bold text-red-500">{idleTimeLeft}</span> ثانية بسبب عدم وجود أي نشاط.
+            </p>
+            <button
+              onClick={() => setShowIdleWarning(false)}
+              className="w-full px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/20 transition-all"
+            >
+              البقاء متصلاً
+            </button>
           </div>
         </div>
       )}

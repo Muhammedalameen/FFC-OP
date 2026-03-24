@@ -102,12 +102,12 @@ export default function Inventory() {
 
   const handleItemChange = (index: number, field: keyof InventoryReportItem, value: string) => {
     const newItems = [...items];
-    const numValue = Number(value) || 0;
-    newItems[index][field] = numValue;
+    const numValue = value === '' ? undefined : Number(value);
+    (newItems[index][field] as any) = numValue;
     
     // Auto calculate consumption: opening + received - closing
     const item = newItems[index];
-    item.consumption = (item.opening || 0) + (item.received || 0) - (item.closing || 0);
+    item.consumption = (Number(item.opening) || 0) + (Number(item.received) || 0) - (Number(item.closing) || 0);
     
     setItems(newItems);
   };
@@ -129,18 +129,27 @@ export default function Inventory() {
       return;
     }
 
+    const cleanItems = items.map(item => ({
+      ...item,
+      opening: Number(item.opening) || 0,
+      received: Number(item.received) || 0,
+      closing: Number(item.closing) || 0,
+      need: Number(item.need) || 0,
+      consumption: Number(item.consumption) || 0
+    }));
+
     if (editingReportId) {
       updateInventoryReport(editingReportId, {
         branchId,
         date,
-        items,
+        items: cleanItems,
         status
       });
     } else {
       addInventoryReport({
         branchId,
         date,
-        items,
+        items: cleanItems,
         createdBy: currentUser!.id,
         status
       });
@@ -459,16 +468,16 @@ export default function Inventory() {
                           <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{invItem.category}</td>
                           <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{invItem.unit}</td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.opening ?? ''} onChange={(e) => handleItemChange(index, 'opening', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.opening ?? ''} onChange={(e) => handleItemChange(index, 'opening', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.received ?? ''} onChange={(e) => handleItemChange(index, 'received', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.received ?? ''} onChange={(e) => handleItemChange(index, 'received', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.waste ?? ''} onChange={(e) => handleItemChange(index, 'waste', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.waste ?? ''} onChange={(e) => handleItemChange(index, 'waste', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.closing ?? ''} onChange={(e) => handleItemChange(index, 'closing', e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.closing ?? ''} onChange={(e) => handleItemChange(index, 'closing', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
                             <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-xl px-2 py-1 text-sm text-gray-700 dark:text-slate-300 font-bold text-center">
@@ -483,6 +492,7 @@ export default function Inventory() {
                                 step="0.001" 
                                 value={item.need ?? ''} 
                                 onChange={(e) => handleItemChange(index, 'need', e.target.value)} 
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                 className={cn(
                                   "w-full bg-white dark:bg-slate-900 border rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all",
                                   item.need > (getAvgConsumption(item.itemId, branchId) * 1.25) && getAvgConsumption(item.itemId, branchId) > 0

@@ -236,6 +236,7 @@ export default function Tickets({ type }: TicketsProps) {
                     placeholder="الكمية"
                     value={newItemQty}
                     onChange={(e) => setNewItemQty(Number(e.target.value))}
+                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     className="bg-gray-50 dark:bg-slate-800 border-none rounded-xl px-4 py-2 text-sm"
                   />
                   <button
@@ -273,6 +274,7 @@ export default function Tickets({ type }: TicketsProps) {
                       type="number"
                       value={estimatedCost}
                       onChange={(e) => setEstimatedCost(Number(e.target.value))}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl pr-10 pl-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
                       placeholder="0.00"
                     />

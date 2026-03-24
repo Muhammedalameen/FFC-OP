@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { format } from 'date-fns';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, limit, where, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from './lib/firebase';
 
 const COLLECTIONS_TO_SYNC = [
@@ -13,86 +13,124 @@ const COLLECTIONS_TO_SYNC = [
 
 let isFirebaseInitialized = false;
 const firebaseLoadedCollections = new Set<string>();
+let isReceivingFromFirebase = false;
+
+let unsubscribeFunctions: (() => void)[] = [];
+let isLocalListenerInitialized = false;
 
 export const initFirebaseSync = async () => {
-  if (isFirebaseInitialized) return;
-  isFirebaseInitialized = true;
+  // Unsubscribe from previous listeners
+  unsubscribeFunctions.forEach(unsub => unsub());
+  unsubscribeFunctions = [];
   
   const state = useStore.getState();
+  const currentUser = state.currentUser;
   
-  // 1. Initial push if Firebase is empty (for first time setup)
+  // 1. Migration & Initial push
   for (const col of COLLECTIONS_TO_SYNC) {
-    const colRef = doc(db, 'system_data', col);
+    const oldDocRef = doc(db, 'system_data', col);
     try {
-      const docSnap = await getDoc(colRef);
-      const localData = state[col as keyof AppState];
-      if (!docSnap.exists() && Array.isArray(localData) && localData.length > 0) {
-        await setDoc(colRef, { data: localData });
-        firebaseLoadedCollections.add(col); // Mark as loaded since we just initialized it
+      const docSnap = await getDoc(oldDocRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data().data;
+        if (Array.isArray(data)) {
+          await Promise.all(data.map((item: any) => setDoc(doc(db, col, item.id), item)));
+          await deleteDoc(oldDocRef);
+          console.log(`Migrated ${col} to new structure`);
+        }
+      } else {
+        const colRef = collection(db, col);
+        const snap = await getDocs(query(colRef, limit(1)));
+        const localData = state[col as keyof AppState];
+        if (snap.empty && Array.isArray(localData) && localData.length > 0) {
+          await Promise.all(localData.map((item: any) => setDoc(doc(db, col, item.id), item)));
+        }
       }
     } catch (e) {
-      console.error(`Error checking initial state for ${col}:`, e);
+      console.error(`Error initializing ${col}:`, e);
     }
   }
 
   // 2. Listen to Firebase changes (Real-time sync)
   COLLECTIONS_TO_SYNC.forEach(col => {
-    const colRef = doc(db, 'system_data', col);
-    onSnapshot(colRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const remoteData = docSnap.data().data;
-        const localData = useStore.getState()[col as keyof AppState];
-        
-        // Mark as loaded from Firebase
-        firebaseLoadedCollections.add(col);
-        
-        // Only update if data is actually different to prevent infinite loops
-        if (JSON.stringify(remoteData) !== JSON.stringify(localData)) {
-          useStore.setState({ [col]: remoteData } as any);
-        }
-      } else {
-        // Document doesn't exist in Firebase yet, mark as loaded so local changes can be pushed
-        firebaseLoadedCollections.add(col);
+    const colRef = collection(db, col);
+    let q = query(colRef);
+    
+    // Apply branch filter for branch managers
+    const userRole = state.customRoles.find(r => r.id === currentUser?.roleId);
+    const canViewAll = userRole?.permissions.includes('view_all_branches');
+    
+    if (!canViewAll && currentUser?.branchId) {
+      const branchCollections = ['revenueReports', 'inventoryReports', 'inspectionReports', 'tickets', 'carHandovers', 'readingRecords'];
+      if (branchCollections.includes(col)) {
+        q = query(colRef, where('branchId', '==', currentUser.branchId));
+      }
+    }
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const remoteData = snapshot.docs.map(doc => doc.data());
+      const localData = useStore.getState()[col as keyof AppState];
+      
+      firebaseLoadedCollections.add(col);
+      
+      if (JSON.stringify(remoteData) !== JSON.stringify(localData)) {
+        isReceivingFromFirebase = true;
+        useStore.setState({ [col]: remoteData } as any);
+        isReceivingFromFirebase = false;
       }
     }, (error) => {
       console.error(`Error listening to ${col}:`, error);
     });
+    
+    unsubscribeFunctions.push(unsub);
   });
 
   // 3. Listen to local changes and push to Firebase
-  const syncTimeouts: Record<string, NodeJS.Timeout> = {};
-  
-  useStore.subscribe((state, prevState) => {
-    COLLECTIONS_TO_SYNC.forEach(col => {
-      // ONLY push to Firebase if we have already loaded the initial data from Firebase
-      if (!firebaseLoadedCollections.has(col)) return;
+  if (!isLocalListenerInitialized) {
+    isLocalListenerInitialized = true;
+    const syncTimeouts: Record<string, NodeJS.Timeout> = {};
+    
+    useStore.subscribe((state, prevState) => {
+      COLLECTIONS_TO_SYNC.forEach(col => {
+        if (!firebaseLoadedCollections.has(col)) return;
 
-      const localData = state[col as keyof AppState];
-      const prevLocalData = prevState[col as keyof AppState];
-      
-      if (localData !== prevLocalData) {
-        // Clear existing timeout for this collection
-        if (syncTimeouts[col]) {
-          clearTimeout(syncTimeouts[col]);
+        const localData = state[col as keyof AppState];
+        const prevLocalData = prevState[col as keyof AppState];
+        
+        if (localData !== prevLocalData && !isReceivingFromFirebase && Array.isArray(localData) && Array.isArray(prevLocalData)) {
+          if (syncTimeouts[col]) {
+            clearTimeout(syncTimeouts[col]);
+          }
+          
+          state.setSyncStatus(col, 'pending');
+          
+          syncTimeouts[col] = setTimeout(() => {
+            state.setSyncStatus(col, 'syncing');
+            
+            const added = localData.filter((item: any) => !prevLocalData.find((p: any) => p.id === item.id));
+            const updated = localData.filter((item: any) => {
+              const prev = prevLocalData.find((p: any) => p.id === item.id);
+              return prev && JSON.stringify(prev) !== JSON.stringify(item);
+            });
+            const deleted = prevLocalData.filter((item: any) => !localData.find((p: any) => p.id === item.id));
+
+            const promises = [
+              ...added.map((item: any) => setDoc(doc(db, col, item.id), item)),
+              ...updated.map((item: any) => setDoc(doc(db, col, item.id), item)),
+              ...deleted.map((item: any) => deleteDoc(doc(db, col, item.id)))
+            ];
+
+            Promise.all(promises).then(() => {
+              useStore.getState().setSyncStatus(col, 'success');
+            }).catch(e => {
+              console.error(`Error saving ${col} to Firebase:`, e);
+              useStore.getState().setSyncStatus(col, 'error', e.message);
+            });
+          }, 1000);
         }
-        
-        // Mark as pending
-        state.setSyncStatus(col, 'pending');
-        
-        // Debounce the write to Firebase by 2 seconds
-        syncTimeouts[col] = setTimeout(() => {
-          state.setSyncStatus(col, 'syncing');
-          const colRef = doc(db, 'system_data', col);
-          setDoc(colRef, { data: localData }).then(() => {
-            useStore.getState().setSyncStatus(col, 'success');
-          }).catch(e => {
-            console.error(`Error saving ${col} to Firebase:`, e);
-            useStore.getState().setSyncStatus(col, 'error', e.message);
-          });
-        }, 2000);
-      }
+      });
     });
-  });
+  }
 };
 
 export const AVAILABLE_PERMISSIONS = [
@@ -590,6 +628,7 @@ export const useStore = create<AppState>()(
             localStorage.removeItem('restaurant_remember_me');
             localStorage.removeItem('restaurant_session_user');
           }
+          initFirebaseSync();
           return true;
         }
         return false;
@@ -598,6 +637,7 @@ export const useStore = create<AppState>()(
         set({ currentUser: null });
         localStorage.removeItem('restaurant_remember_me');
         localStorage.removeItem('restaurant_session_user');
+        initFirebaseSync();
       },
       setTheme: (theme) => set({ theme }),
       addNotification: (message, type, duration = 3000, undoAction) => {
