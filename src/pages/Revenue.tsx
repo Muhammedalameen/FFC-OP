@@ -65,6 +65,36 @@ export default function Revenue() {
     setShifts(newShifts);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shiftIndex: number, field: string) => {
+    const fields = ['employeeName', 'cash', 'pos', 'delivery'];
+    const colIndex = fields.indexOf(field);
+    
+    // Allow normal cursor movement inside text inputs
+    if (field === 'employeeName' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      return;
+    }
+
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      
+      let nextRow = shiftIndex;
+      let nextCol = colIndex;
+
+      if (e.key === 'ArrowUp') nextRow = Math.max(0, shiftIndex - 1);
+      if (e.key === 'ArrowDown') nextRow = Math.min(shifts.length - 1, shiftIndex + 1);
+      if (e.key === 'ArrowRight') nextCol = Math.max(0, colIndex - 1);
+      if (e.key === 'ArrowLeft') nextCol = Math.min(fields.length - 1, colIndex + 1);
+
+      if (nextRow !== shiftIndex || nextCol !== colIndex) {
+        const nextInput = document.querySelector(`input[data-row="${nextRow}"][data-col="${fields[nextCol]}"]`) as HTMLInputElement;
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
+      }
+    }
+  };
+
   const handleImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -385,6 +415,9 @@ export default function Revenue() {
                             type="text"
                             value={shift.employeeName}
                             onChange={(e) => handleShiftChange(index, 'employeeName', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'employeeName')}
+                            data-row={index}
+                            data-col="employeeName"
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="اسم الموظف"
                             required
@@ -398,6 +431,9 @@ export default function Revenue() {
                             step="0.01"
                             value={shift.cash === '' ? '' : shift.cash}
                             onChange={(e) => handleShiftChange(index, 'cash', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'cash')}
+                            data-row={index}
+                            data-col="cash"
                             onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
@@ -411,6 +447,9 @@ export default function Revenue() {
                             step="0.01"
                             value={shift.pos === '' ? '' : shift.pos}
                             onChange={(e) => handleShiftChange(index, 'pos', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'pos')}
+                            data-row={index}
+                            data-col="pos"
                             onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"
@@ -424,6 +463,9 @@ export default function Revenue() {
                             step="0.01"
                             value={shift.delivery === '' ? '' : shift.delivery}
                             onChange={(e) => handleShiftChange(index, 'delivery', e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, index, 'delivery')}
+                            data-row={index}
+                            data-col="delivery"
                             onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             placeholder="0.00"

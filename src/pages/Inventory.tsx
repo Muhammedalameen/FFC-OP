@@ -113,6 +113,31 @@ export default function Inventory() {
     setItems(newItems);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIndex: number, field: string) => {
+    const fields = ['opening', 'received', 'waste', 'closing', 'need'];
+    const colIndex = fields.indexOf(field);
+    
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      
+      let nextRow = rowIndex;
+      let nextCol = colIndex;
+
+      if (e.key === 'ArrowUp') nextRow = Math.max(0, rowIndex - 1);
+      if (e.key === 'ArrowDown') nextRow = Math.min(items.length - 1, rowIndex + 1);
+      if (e.key === 'ArrowRight') nextCol = Math.max(0, colIndex - 1);
+      if (e.key === 'ArrowLeft') nextCol = Math.min(fields.length - 1, colIndex + 1);
+
+      if (nextRow !== rowIndex || nextCol !== colIndex) {
+        const nextInput = document.querySelector(`input[data-row="${nextRow}"][data-col="${fields[nextCol]}"]`) as HTMLInputElement;
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
+      }
+    }
+  };
+
   const saveReport = (status: 'draft' | 'pending') => {
     if (!branchId) return;
 
@@ -469,16 +494,16 @@ export default function Inventory() {
                           <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{invItem.category}</td>
                           <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{invItem.unit}</td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.opening ?? ''} onChange={(e) => handleItemChange(index, 'opening', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.opening ?? ''} onChange={(e) => handleItemChange(index, 'opening', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'opening')} data-row={index} data-col="opening" onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.received ?? ''} onChange={(e) => handleItemChange(index, 'received', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.received ?? ''} onChange={(e) => handleItemChange(index, 'received', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'received')} data-row={index} data-col="received" onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.waste ?? ''} onChange={(e) => handleItemChange(index, 'waste', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.waste ?? ''} onChange={(e) => handleItemChange(index, 'waste', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'waste')} data-row={index} data-col="waste" onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="number" min="0" step="0.001" value={item.closing ?? ''} onChange={(e) => handleItemChange(index, 'closing', e.target.value)} onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
+                            <input type="number" min="0" step="0.001" value={item.closing ?? ''} onChange={(e) => handleItemChange(index, 'closing', e.target.value)} onKeyDown={(e) => handleKeyDown(e, index, 'closing')} data-row={index} data-col="closing" onWheel={(e) => (e.target as HTMLInputElement).blur()} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500" />
                           </td>
                           <td className="px-4 py-3">
                             <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-xl px-2 py-1 text-sm text-gray-700 dark:text-slate-300 font-bold text-center">
@@ -493,6 +518,9 @@ export default function Inventory() {
                                 step="0.001" 
                                 value={item.need ?? ''} 
                                 onChange={(e) => handleItemChange(index, 'need', e.target.value)} 
+                                onKeyDown={(e) => handleKeyDown(e, index, 'need')}
+                                data-row={index}
+                                data-col="need"
                                 onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                 className={cn(
                                   "w-full bg-white dark:bg-slate-900 border rounded-xl px-2 py-1 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all",
