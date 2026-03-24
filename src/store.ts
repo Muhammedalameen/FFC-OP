@@ -26,6 +26,7 @@ export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLL
   
   // 1. Migration & Initial push (only once for the whole system)
   if (!isFirebaseInitialized) {
+    isFirebaseInitialized = true; // Set early to prevent parallel migration attempts
     for (const col of COLLECTIONS_TO_SYNC) {
       const oldDocRef = doc(db, 'system_data', col);
       try {
@@ -49,7 +50,6 @@ export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLL
         console.error(`Error initializing ${col}:`, e);
       }
     }
-    isFirebaseInitialized = true;
   }
 
   // 2. Unsubscribe from collections no longer needed
@@ -1076,8 +1076,16 @@ export const useStore = create<AppState>()(
     {
       name: 'restaurant-system-storage',
       partialize: (state) => {
-        // Exclude session-specific and temporary data from Firestore
-        const { currentUser, notifications, isDbConnected, ...rest } = state;
+        // Exclude all collections that are synced with Firebase to ensure each device
+        // fetches its own data separately from the database on every load.
+        const { 
+          currentUser, notifications, isDbConnected,
+          users, customRoles, branches, cars, inventoryItems,
+          operationalItems, revenueReports, inventoryReports,
+          inspectionReports, scheduledReadingItems, readingRecords,
+          tickets, carHandovers,
+          ...rest 
+        } = state;
         return rest;
       },
     }
