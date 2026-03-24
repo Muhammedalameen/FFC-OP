@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useStore } from '../store';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useStore, initFirebaseSync } from '../store';
 import { DollarSign, Calendar, BarChart3, ArrowUpRight, Building2, Printer, Check, Clock, Filter, X } from 'lucide-react';
 import { 
   format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, 
@@ -61,6 +61,13 @@ export default function RevenueReports() {
         return { start: startOfMonth(now), end: endOfDay(now) };
     }
   }, [appliedDateFilter, appliedCustomRange]);
+
+  useEffect(() => {
+    initFirebaseSync(['revenueReports'], {
+      start: format(dateRange.start, 'yyyy-MM-dd'),
+      end: format(dateRange.end, 'yyyy-MM-dd')
+    });
+  }, [dateRange]);
 
   const { stats, chartData } = useMemo(() => {
     const filteredRevenue = revenueReports.filter(r => {

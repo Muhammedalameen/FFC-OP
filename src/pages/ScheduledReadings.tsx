@@ -31,16 +31,19 @@ export default function ScheduledReadings() {
     customRoles
   } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['scheduledReadingItems', 'readingRecords']);
-  }, []);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedBranchId, setSelectedBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
   const canAdd = userRole?.permissions.includes('add_reports') || userRole?.permissions.includes('add_scheduled');
 
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedBranchId, setSelectedBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
+  useEffect(() => {
+    initFirebaseSync(['scheduledReadingItems', 'readingRecords'], {
+      start: format(selectedDate, 'yyyy-MM-dd'),
+      end: format(selectedDate, 'yyyy-MM-dd')
+    });
+  }, [selectedDate]);
   const [tempImages, setTempImages] = useState<Record<string, string[]>>({});
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 

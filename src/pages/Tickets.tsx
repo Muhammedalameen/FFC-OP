@@ -16,8 +16,8 @@ export default function Tickets({ type }: TicketsProps) {
   const { currentUser, customRoles, branches, users, tickets, addTicket, updateTicketStatus, addTicketComment, deleteTicket } = useStore();
 
   useEffect(() => {
-    initFirebaseSync(['tickets']);
-  }, []);
+    initFirebaseSync(['tickets'], filterDate);
+  }, [filterDate]);
   const [isAdding, setIsAdding] = useState(false);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');

@@ -10,37 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function Inventory() {
   const { currentUser, customRoles, branches, inventoryItems, inventoryReports, addInventoryReport, updateInventoryReport, deleteInventoryReport, addNotification, restoreInventoryReport } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['inventoryItems', 'inventoryReports']);
-  }, []);
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingReportId, setEditingReportId] = useState<string | null>(null);
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-  
-  // Form State
-  const [date, setDate] = useState(getDefaultReportDate());
-  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
-  const [items, setItems] = useState<InventoryReportItem[]>([]);
-  const [importDate, setImportDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
-
-  // Calculate average consumption for an item in a branch
-  const getAvgConsumption = (itemId: string, bId: string) => {
-    // Filter reports for this branch from the last 30 days to get a good average
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const relevantReports = inventoryReports.filter(r => 
-      r.branchId === bId && isAfter(parseISO(r.date), thirtyDaysAgo)
-    );
-    
-    if (relevantReports.length === 0) return 0;
-    
-    const totalCons = relevantReports.reduce((sum, r) => {
-      const item = r.items.find(i => i.itemId === itemId);
-      return sum + (item?.consumption || 0);
-    }, 0);
-    
-    return totalCons / relevantReports.length;
-  };
-
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const permissions = userRole?.permissions || [];
   const canViewAll = permissions.includes('view_all_branches');
@@ -53,32 +22,20 @@ export default function Inventory() {
   const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
-  // Load items for the selected branch or when editing
   useEffect(() => {
-    if (editingReportId) {
-      const report = inventoryReports.find(r => r.id === editingReportId);
-      if (report) {
-        setBranchId(report.branchId);
-        setDate(report.date);
-        setItems(report.items);
-      }
-    } else if (isAdding && branchId) {
-      const branchItems = inventoryItems.filter(i => i.branchIds.includes(branchId));
-      
-      const initialItems = branchItems.map(item => {
-        return {
-          itemId: item.id,
-          opening: 0,
-          received: 0,
-          waste: 0,
-          closing: 0,
-          need: 0,
-          consumption: 0
-        };
-      });
-      setItems(initialItems);
-    }
-  }, [isAdding, branchId, inventoryItems, editingReportId, inventoryReports]);
+    initFirebaseSync(['inventoryItems', 'inventoryReports'], filterDate);
+  }, [filterDate]);
+
+  const [isAdding, setIsAdding] = useState(false);
+  const [addStep, setAddStep] = useState(1);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  
+  // Form State
+  const [date, setDate] = useState(getDefaultReportDate());
+  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
+  const [items, setItems] = useState<InventoryReportItem[]>([]);
+  const [importDate, setImportDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
 
   const handleImportOpening = () => {
     if (!branchId || !importDate) return;
@@ -182,6 +139,7 @@ export default function Inventory() {
     }
     setIsAdding(false);
     setEditingReportId(null);
+    setAddStep(1);
     setItems([]);
   };
 
@@ -196,6 +154,10 @@ export default function Inventory() {
 
   const handleEditReport = (report: any) => {
     setEditingReportId(report.id);
+    setBranchId(report.branchId);
+    setDate(report.date);
+    setItems(report.items);
+    setAddStep(2);
     setIsAdding(true);
   };
 
@@ -367,6 +329,7 @@ export default function Inventory() {
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">جرد المخزون</h1>
+      {!isAdding && (
         <div className="flex items-center gap-2">
           <div className="flex bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-1 shadow-sm">
             <button onClick={handleExportXLSX} className="p-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg transition-colors" title="تصدير Excel">
@@ -381,34 +344,38 @@ export default function Inventory() {
               onClick={() => {
                 setEditingReportId(null);
                 setIsAdding(!isAdding);
+                setAddStep(1);
                 setItems([]);
                 setDate(getDefaultReportDate());
               }}
               className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
             >
               <Plus size={20} />
-              <span>إضافة جرد</span>
+              <span>{isAdding ? 'إلغاء' : 'إضافة جرد'}</span>
             </button>
           )}
         </div>
+      )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Calendar size={18} className="text-gray-400" />
-          <input type="date" value={filterDate.start} onChange={e => setFilterDate(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
-          <span className="text-gray-400">إلى</span>
-          <input type="date" value={filterDate.end} onChange={e => setFilterDate(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
+      {!isAdding && (
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Calendar size={18} className="text-gray-400" />
+            <input type="date" value={filterDate.start} onChange={e => setFilterDate(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
+            <span className="text-gray-400">إلى</span>
+            <input type="date" value={filterDate.end} onChange={e => setFilterDate(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
+          </div>
+          <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />
+          <div className="flex items-center gap-2">
+            <Building2 size={18} className="text-gray-400" />
+            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
+              {canViewAll && <option value="all">كافة الفروع</option>}
+              {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
         </div>
-        <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />
-        <div className="flex items-center gap-2">
-          <Building2 size={18} className="text-gray-400" />
-          <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
-            {canViewAll && <option value="all">كافة الفروع</option>}
-            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </div>
-      </div>
+      )}
 
       <AnimatePresence>
         {isAdding && (
@@ -421,36 +388,86 @@ export default function Inventory() {
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
               {editingReportId ? 'تعديل تقرير جرد' : 'تقرير جرد جديد'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                {canViewAll && (
+            
+            {addStep === 1 ? (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!branchId) {
+                  alert('الرجاء اختيار الفرع');
+                  return;
+                }
+                const existingReport = inventoryReports.find(r => r.branchId === branchId && r.date === date && r.id !== editingReportId);
+                if (existingReport) {
+                  alert('عذراً، يوجد تقرير جرد مسجل مسبقاً لهذا الفرع في نفس التاريخ (حتى لو كان مسودة). لا يمكن إضافة أكثر من تقرير لنفس اليوم.');
+                  return;
+                }
+                if (!editingReportId) {
+                  const branchItems = inventoryItems.filter(i => i.branchIds.includes(branchId));
+                  const initialItems = branchItems.map(item => ({
+                    itemId: item.id,
+                    opening: 0,
+                    received: 0,
+                    waste: 0,
+                    closing: 0,
+                    need: 0,
+                    consumption: 0
+                  }));
+                  setItems(initialItems);
+                }
+                setAddStep(2);
+              }} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
-                    <select
-                      value={branchId}
-                      onChange={(e) => setBranchId(e.target.value)}
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
                       className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                       required
-                      disabled={!!editingReportId}
-                    >
-                      <option value="">اختر الفرع</option>
-                      {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    />
                   </div>
-                )}
-              </div>
+                  {canViewAll && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
+                      <select
+                        value={branchId}
+                        onChange={(e) => setBranchId(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                        required
+                        disabled={!!editingReportId}
+                      >
+                        <option value="">اختر الفرع</option>
+                        {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-slate-800">
+                  <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); setAddStep(1); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                    إلغاء
+                  </button>
+                  <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all">
+                    التالي
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                  <div>
+                    <span className="block text-xs text-gray-500 dark:text-slate-400 mb-1">التاريخ</span>
+                    <span className="font-bold text-gray-900 dark:text-white">{date}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500 dark:text-slate-400 mb-1">الفرع</span>
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {branches.find(b => b.id === branchId)?.name || 'غير محدد'}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800 flex flex-col md:flex-row items-end gap-4">
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800 flex flex-col md:flex-row items-end gap-4">
                 <div className="w-full md:w-auto flex-1">
                   <label className="block text-sm font-semibold text-indigo-900 dark:text-indigo-300 mb-2">استيراد مخزون أول المدة من تاريخ سابق</label>
                   <input
@@ -554,8 +571,11 @@ export default function Inventory() {
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-slate-800">
-                <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); setAddStep(1); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
                   إلغاء
+                </button>
+                <button type="button" onClick={() => setAddStep(1)} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                  السابق
                 </button>
                 <button 
                   type="button" 
@@ -570,12 +590,14 @@ export default function Inventory() {
                 </button>
               </div>
             </form>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
+      {!isAdding && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-right">
             <thead className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
               <tr>
@@ -651,6 +673,7 @@ export default function Inventory() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Report Details Modal */}
       {selectedReport && (

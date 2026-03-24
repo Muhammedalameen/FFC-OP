@@ -9,13 +9,14 @@ import { cn } from '../lib/utils';
 export default function Dashboard() {
   const { currentUser, customRoles, branches, revenueReports, inventoryReports, tickets, scheduledReadingItems, readingRecords, users } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['revenueReports', 'inventoryReports', 'tickets', 'scheduledReadingItems', 'readingRecords']);
-  }, []);
   const navigate = useNavigate();
   
   const [dateRange, setDateRange] = useState(getDefaultFilterRange());
   const [selectedBranch, setSelectedBranch] = useState('all');
+
+  useEffect(() => {
+    initFirebaseSync(['revenueReports', 'inventoryReports', 'tickets', 'scheduledReadingItems', 'readingRecords'], dateRange);
+  }, [dateRange]);
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');

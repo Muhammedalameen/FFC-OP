@@ -16,11 +16,15 @@ const firebaseLoadedCollections = new Set<string>();
 let isReceivingFromFirebase = false;
 
 let activeListeners: Record<string, () => void> = {};
+let activeQueries: Record<string, string> = {};
 let isLocalListenerInitialized = false;
 
 export const GLOBAL_COLLECTIONS = ['users', 'customRoles', 'branches'];
 
-export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLLECTIONS) => {
+export const initFirebaseSync = async (
+  targetCollections: string[] = GLOBAL_COLLECTIONS,
+  dateRange?: { start: string, end: string }
+) => {
   const state = useStore.getState();
   const currentUser = state.currentUser;
   
@@ -62,6 +66,7 @@ export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLL
     if (!requiredCollections.includes(col)) {
       activeListeners[col]();
       delete activeListeners[col];
+      delete activeQueries[col];
       firebaseLoadedCollections.delete(col);
       console.log(`Unsubscribed from ${col}`);
     }
@@ -69,8 +74,6 @@ export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLL
 
   // 3. Listen to Firebase changes (Real-time sync)
   requiredCollections.forEach(col => {
-    if (activeListeners[col]) return; // Already subscribed
-
     const colRef = collection(db, col);
     let q = query(colRef);
     
@@ -78,12 +81,37 @@ export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLL
     const userRole = state.customRoles.find(r => r.id === currentUser?.roleId);
     const canViewAll = userRole?.permissions.includes('view_all_branches');
     
+    let queryParams: any = { branchId: canViewAll ? 'all' : currentUser?.branchId };
+
     if (!canViewAll && currentUser?.branchId) {
       const branchCollections = ['revenueReports', 'inventoryReports', 'inspectionReports', 'tickets', 'carHandovers', 'readingRecords'];
       if (branchCollections.includes(col)) {
         q = query(colRef, where('branchId', '==', currentUser.branchId));
       }
     }
+
+    // Apply date filter if provided
+    if (dateRange && ['revenueReports', 'inventoryReports', 'inspectionReports', 'tickets', 'readingRecords'].includes(col)) {
+      q = query(q, where('date', '>=', dateRange.start), where('date', '<=', dateRange.end));
+      queryParams.dateRange = dateRange;
+    } else if (dateRange && col === 'carHandovers') {
+      q = query(q, where('createdAt', '>=', dateRange.start), where('createdAt', '<=', dateRange.end + 'T23:59:59'));
+      queryParams.dateRange = dateRange;
+    }
+
+    const queryKey = JSON.stringify(queryParams);
+
+    if (activeListeners[col]) {
+      if (activeQueries[col] === queryKey) {
+        return; // Already subscribed with the same query
+      } else {
+        // Query changed, unsubscribe first
+        activeListeners[col]();
+        console.log(`Query changed for ${col}, resubscribing...`);
+      }
+    }
+
+    activeQueries[col] = queryKey;
 
     const unsub = onSnapshot(q, (snapshot) => {
       const remoteData = snapshot.docs.map(doc => doc.data());
@@ -699,7 +727,23 @@ export const useStore = create<AppState>()(
         return false;
       },
       logout: () => {
-        set({ currentUser: null, currentSessionId: null });
+        set({ 
+          currentUser: null, 
+          currentSessionId: null,
+          users: initialUsers,
+          customRoles: initialRoles,
+          branches: initialBranches,
+          inventoryItems: initialInventoryItems,
+          operationalItems: initialOperationalItems,
+          revenueReports: [],
+          inventoryReports: [],
+          inspectionReports: [],
+          scheduledReadingItems: initialScheduledReadingItems,
+          readingRecords: [],
+          tickets: [],
+          cars: [],
+          carHandovers: []
+        });
         localStorage.removeItem('restaurant_remember_me');
         localStorage.removeItem('restaurant_session_user');
         sessionStorage.removeItem('restaurant_session_id');

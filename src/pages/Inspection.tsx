@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, InspectionReportItem } from '../store';
+import { useStore, InspectionReportItem, initFirebaseSync } from '../store';
 import { Plus, Trash2, Save, CheckCircle, XCircle, MinusCircle, Calendar, Building2, Download, Filter } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF } from '../lib/exportUtils';
@@ -8,11 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Inspection() {
   const { currentUser, customRoles, branches, operationalItems, inspectionReports, addInspectionReport, deleteInspectionReport, addNotification, restoreInspectionReport } = useStore();
-  const [isAdding, setIsAdding] = useState(false);
-  const [date, setDate] = useState(getDefaultReportDate());
-  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
-  const [items, setItems] = useState<InspectionReportItem[]>([]);
-
+  
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
   const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
@@ -24,14 +20,14 @@ export default function Inspection() {
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   useEffect(() => {
-    if (isAdding) {
-      setItems(operationalItems.map(item => ({
-        itemId: item.id,
-        status: 'na',
-        notes: ''
-      })));
-    }
-  }, [isAdding, operationalItems]);
+    initFirebaseSync(['operationalItems', 'inspectionReports'], filterDate);
+  }, [filterDate]);
+
+  const [isAdding, setIsAdding] = useState(false);
+  const [addStep, setAddStep] = useState(1);
+  const [date, setDate] = useState(getDefaultReportDate());
+  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
+  const [items, setItems] = useState<InspectionReportItem[]>([]);
 
   const handleItemChange = (index: number, field: keyof InspectionReportItem, value: string) => {
     const newItems = [...items];
@@ -50,6 +46,7 @@ export default function Inspection() {
       createdBy: currentUser!.id
     });
     setIsAdding(false);
+    setAddStep(1);
   };
 
   const filteredReports = inspectionReports.filter(r => {
@@ -101,43 +98,51 @@ export default function Inspection() {
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">تقارير التشغيل</h1>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-1 shadow-sm">
-            <button onClick={handleExportXLSX} className="p-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg transition-colors" title="تصدير Excel">
-              <Download size={20} />
-            </button>
-            <button onClick={handleExportPDF} className="p-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg transition-colors" title="تصدير PDF">
-              <Filter size={20} className="rotate-90" />
-            </button>
+        {!isAdding && (
+          <div className="flex items-center gap-2">
+            <div className="flex bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-1 shadow-sm">
+              <button onClick={handleExportXLSX} className="p-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg transition-colors" title="تصدير Excel">
+                <Download size={20} />
+              </button>
+              <button onClick={handleExportPDF} className="p-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg transition-colors" title="تصدير PDF">
+                <Filter size={20} className="rotate-90" />
+              </button>
+            </div>
+            {canAdd && (
+              <button
+                onClick={() => {
+                  setIsAdding(!isAdding);
+                  setAddStep(1);
+                  setDate(getDefaultReportDate());
+                }}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 font-bold"
+              >
+                <Plus size={20} />
+                <span>{isAdding ? 'إلغاء' : 'إضافة تقرير'}</span>
+              </button>
+            )}
           </div>
-          {canAdd && (
-            <button
-              onClick={() => setIsAdding(!isAdding)}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 font-bold"
-            >
-              <Plus size={20} />
-              <span>إضافة تقرير</span>
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Calendar size={18} className="text-gray-400" />
-          <input type="date" value={filterDate.start} onChange={e => setFilterDate(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
-          <span className="text-gray-400">إلى</span>
-          <input type="date" value={filterDate.end} onChange={e => setFilterDate(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
+      {!isAdding && (
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Calendar size={18} className="text-gray-400" />
+            <input type="date" value={filterDate.start} onChange={e => setFilterDate(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
+            <span className="text-gray-400">إلى</span>
+            <input type="date" value={filterDate.end} onChange={e => setFilterDate(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0" />
+          </div>
+          <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />
+          <div className="flex items-center gap-2">
+            <Building2 size={18} className="text-gray-400" />
+            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
+              {canViewAll && <option value="all">كافة الفروع</option>}
+              {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
         </div>
-        <div className="h-6 w-px bg-gray-100 dark:bg-slate-800 hidden md:block" />
-        <div className="flex items-center gap-2">
-          <Building2 size={18} className="text-gray-400" />
-          <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="bg-transparent border-none text-sm text-gray-600 dark:text-slate-300 focus:ring-0 outline-none" disabled={!canViewAll}>
-            {canViewAll && <option value="all">كافة الفروع</option>}
-            {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </div>
-      </div>
+      )}
 
       <AnimatePresence>
         {isAdding && (
@@ -148,35 +153,77 @@ export default function Inspection() {
             className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-800"
           >
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">تقرير تشغيل جديد</h2>
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
-                    required
-                  />
-                </div>
-                {canViewAll && (
+            
+            {addStep === 1 ? (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!branchId) {
+                  alert('الرجاء اختيار الفرع');
+                  return;
+                }
+                const existingReport = inspectionReports.find(r => r.branchId === branchId && r.date === date);
+                if (existingReport) {
+                  alert('عذراً، يوجد تقرير تشغيل مسجل مسبقاً لهذا الفرع في نفس التاريخ. لا يمكن إضافة أكثر من تقرير لنفس اليوم.');
+                  return;
+                }
+                setItems(operationalItems.map(item => ({
+                  itemId: item.id,
+                  status: 'na',
+                  notes: ''
+                })));
+                setAddStep(2);
+              }} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
-                    <select
-                      value={branchId}
-                      onChange={(e) => setBranchId(e.target.value)}
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
                       className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
                       required
-                    >
-                      <option value="">اختر الفرع</option>
-                      {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    />
                   </div>
-                )}
-              </div>
+                  {canViewAll && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
+                      <select
+                        value={branchId}
+                        onChange={(e) => setBranchId(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
+                        required
+                      >
+                        <option value="">اختر الفرع</option>
+                        {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-slate-800">
+                  <button type="button" onClick={() => { setIsAdding(false); setAddStep(1); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                    إلغاء
+                  </button>
+                  <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all">
+                    التالي
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                  <div>
+                    <span className="block text-xs text-gray-500 dark:text-slate-400 mb-1">التاريخ</span>
+                    <span className="font-bold text-gray-900 dark:text-white">{date}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500 dark:text-slate-400 mb-1">الفرع</span>
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {branches.find(b => b.id === branchId)?.name || 'غير محدد'}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="space-y-10">
+                <div className="space-y-10">
                 {categories.map(category => (
                   <div key={category} className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -243,20 +290,25 @@ export default function Inspection() {
               </div>
 
               <div className="flex justify-end gap-4 pt-8 border-t border-gray-100 dark:border-slate-800">
-                <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl font-bold transition-colors">
+                <button type="button" onClick={() => { setIsAdding(false); setAddStep(1); }} className="px-6 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl font-bold transition-colors">
                   إلغاء
+                </button>
+                <button type="button" onClick={() => setAddStep(1)} className="px-6 py-3 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl font-bold transition-colors">
+                  السابق
                 </button>
                 <button type="submit" disabled={items.length === 0} className="px-10 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold shadow-lg shadow-indigo-500/20 transition-all">
                   <Save size={20} /> حفظ التقرير
                 </button>
               </div>
             </form>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
+      {!isAdding && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-right">
             <thead className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
               <tr>
@@ -319,6 +371,7 @@ export default function Inspection() {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

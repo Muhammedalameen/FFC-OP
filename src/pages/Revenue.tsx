@@ -12,18 +12,6 @@ import { cn } from '../lib/utils';
 export default function Revenue() {
   const { currentUser, customRoles, branches, revenueReports, addRevenueReport, updateRevenueReport, deleteRevenueReport, addNotification, restoreRevenueReport } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['revenueReports']);
-  }, []);
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingReportId, setEditingReportId] = useState<string | null>(null);
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-  
-  // Form State
-  const [date, setDate] = useState(getDefaultReportDate());
-  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
-  const [shifts, setShifts] = useState<Omit<ShiftRevenue, 'id'>[]>([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
-
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
   const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
@@ -32,19 +20,19 @@ export default function Revenue() {
   const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
-  // Load report data when editing
   useEffect(() => {
-    if (editingReportId) {
-      const report = revenueReports.find(r => r.id === editingReportId);
-      if (report) {
-        setBranchId(report.branchId);
-        setDate(report.date);
-        setShifts(report.shifts.map(s => ({ ...s })));
-      }
-    } else if (isAdding) {
-      setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
-    }
-  }, [editingReportId, isAdding, revenueReports]);
+    initFirebaseSync(['revenueReports'], filterDate);
+  }, [filterDate]);
+
+  const [isAdding, setIsAdding] = useState(false);
+  const [addStep, setAddStep] = useState<1 | 2>(1);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  
+  // Form State
+  const [date, setDate] = useState(getDefaultReportDate());
+  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
+  const [shifts, setShifts] = useState<Omit<ShiftRevenue, 'id'>[]>([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
 
   const handleAddShift = () => {
     setShifts([...shifts, { cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
@@ -161,6 +149,7 @@ export default function Revenue() {
     }
     setIsAdding(false);
     setEditingReportId(null);
+    setAddStep(1);
     setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
   };
 
@@ -175,6 +164,10 @@ export default function Revenue() {
 
   const handleEditReport = (report: any) => {
     setEditingReportId(report.id);
+    setBranchId(report.branchId);
+    setDate(report.date);
+    setShifts(report.shifts.map((s: any) => ({ ...s })));
+    setAddStep(2);
     setIsAdding(true);
   };
 
@@ -313,13 +306,14 @@ export default function Revenue() {
               onClick={() => {
                 setEditingReportId(null);
                 setIsAdding(!isAdding);
+                setAddStep(1);
                 setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
                 setDate(getDefaultReportDate());
               }}
               className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
             >
               <Plus size={20} />
-              <span>إضافة تقرير</span>
+              <span>{isAdding ? 'إلغاء' : 'إضافة تقرير'}</span>
             </button>
           )}
         </div>
@@ -353,36 +347,76 @@ export default function Revenue() {
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
               {editingReportId ? 'تعديل تقرير إيراد' : 'تقرير إيراد جديد'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                {canViewAll && (
+            
+            {addStep === 1 ? (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!branchId) {
+                  alert('الرجاء اختيار الفرع');
+                  return;
+                }
+                const existingReport = revenueReports.find(r => r.branchId === branchId && r.date === date && r.id !== editingReportId);
+                if (existingReport) {
+                  alert('عذراً، يوجد تقرير إيرادات مسجل مسبقاً لهذا الفرع في نفس التاريخ (حتى لو كان مسودة). لا يمكن إضافة أكثر من تقرير لنفس اليوم.');
+                  return;
+                }
+                if (!editingReportId) {
+                  setShifts([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
+                }
+                setAddStep(2);
+              }} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
-                    <select
-                      value={branchId}
-                      onChange={(e) => setBranchId(e.target.value)}
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">التاريخ</label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
                       className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                       required
-                      disabled={!!editingReportId}
-                    >
-                      <option value="">اختر الفرع</option>
-                      {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    />
                   </div>
-                )}
-              </div>
+                  {canViewAll && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">الفرع</label>
+                      <select
+                        value={branchId}
+                        onChange={(e) => setBranchId(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                        required
+                        disabled={!!editingReportId}
+                      >
+                        <option value="">اختر الفرع</option>
+                        {userBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-slate-800">
+                  <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); setAddStep(1); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                    إلغاء
+                  </button>
+                  <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all">
+                    التالي
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                  <div>
+                    <span className="block text-xs text-gray-500 dark:text-slate-400 mb-1">التاريخ</span>
+                    <span className="font-bold text-gray-900 dark:text-white">{date}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500 dark:text-slate-400 mb-1">الفرع</span>
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {branches.find(b => b.id === branchId)?.name || 'غير محدد'}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="space-y-6">
+                <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-md font-bold text-gray-900 dark:text-white">الورديات</h3>
                   <button type="button" onClick={handleAddShift} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold hover:underline">
@@ -515,8 +549,11 @@ export default function Revenue() {
                   {/* Draft badge removed */}
                 </div>
                 <div className="flex gap-3">
-                  <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                  <button type="button" onClick={() => { setIsAdding(false); setEditingReportId(null); setAddStep(1); }} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
                     إلغاء
+                  </button>
+                  <button type="button" onClick={() => setAddStep(1)} className="px-6 py-2 text-gray-600 dark:text-slate-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 rounded-2xl transition-colors">
+                    السابق
                   </button>
                   <button 
                     type="button" 
@@ -532,12 +569,14 @@ export default function Revenue() {
                 </div>
               </div>
             </form>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
+      {!isAdding && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-right">
             <thead className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
               <tr>
@@ -634,6 +673,7 @@ export default function Revenue() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Report Details Modal */}
       {selectedReport && (
