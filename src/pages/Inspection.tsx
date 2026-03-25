@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, InspectionReportItem, initFirebaseSync } from '../store';
+import { useStore, InspectionReportItem } from '../store';
 import { Plus, Trash2, Save, CheckCircle, XCircle, MinusCircle, Calendar, Building2, Download, Filter } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF } from '../lib/exportUtils';
@@ -8,7 +8,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Inspection() {
   const { currentUser, customRoles, branches, operationalItems, inspectionReports, addInspectionReport, deleteInspectionReport, addNotification, restoreInspectionReport } = useStore();
-  
+  const [isAdding, setIsAdding] = useState(false);
+  const [addStep, setAddStep] = useState(1);
+  const [date, setDate] = useState(getDefaultReportDate());
+  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
+  const [items, setItems] = useState<InspectionReportItem[]>([]);
+
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');
   const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
@@ -18,16 +23,6 @@ export default function Inspection() {
   // Filter State
   const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
-
-  useEffect(() => {
-    initFirebaseSync(['operationalItems', 'inspectionReports'], filterDate);
-  }, [filterDate]);
-
-  const [isAdding, setIsAdding] = useState(false);
-  const [addStep, setAddStep] = useState(1);
-  const [date, setDate] = useState(getDefaultReportDate());
-  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
-  const [items, setItems] = useState<InspectionReportItem[]>([]);
 
   const handleItemChange = (index: number, field: keyof InspectionReportItem, value: string) => {
     const newItems = [...items];

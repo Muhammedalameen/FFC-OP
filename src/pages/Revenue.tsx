@@ -12,18 +12,9 @@ import { cn } from '../lib/utils';
 export default function Revenue() {
   const { currentUser, customRoles, branches, revenueReports, addRevenueReport, updateRevenueReport, deleteRevenueReport, addNotification, restoreRevenueReport } = useStore();
 
-  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
-  const canViewAll = userRole?.permissions.includes('view_all_branches');
-  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
-
-  // Filter State
-  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
-  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
-
   useEffect(() => {
-    initFirebaseSync(['revenueReports'], filterDate);
-  }, [filterDate]);
-
+    initFirebaseSync(['revenueReports']);
+  }, []);
   const [isAdding, setIsAdding] = useState(false);
   const [addStep, setAddStep] = useState<1 | 2>(1);
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
@@ -33,6 +24,14 @@ export default function Revenue() {
   const [date, setDate] = useState(getDefaultReportDate());
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
   const [shifts, setShifts] = useState<Omit<ShiftRevenue, 'id'>[]>([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
+
+  const userRole = customRoles.find(r => r.id === currentUser?.roleId);
+  const canViewAll = userRole?.permissions.includes('view_all_branches');
+  const userBranches = branches.filter(b => canViewAll || b.id === currentUser?.branchId);
+
+  // Filter State
+  const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
+  const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
 
   const handleAddShift = () => {
     setShifts([...shifts, { cash: 0, pos: 0, delivery: 0, employeeName: '' }]);

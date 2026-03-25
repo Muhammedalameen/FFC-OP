@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useStore, initFirebaseSync } from '../store';
+import { useStore } from '../store';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Camera, Upload, X, Save, ArrowRight, Car, Calendar, FileText, Gauge, Fuel } from 'lucide-react';
 
@@ -8,10 +8,6 @@ import { format } from 'date-fns';
 export default function ReturnCarHandover() {
   const { id } = useParams<{ id: string }>();
   const { carHandovers, cars, currentUser, returnCarHandover } = useStore();
-  
-  useEffect(() => {
-    initFirebaseSync(['cars', 'carHandovers']);
-  }, []);
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 

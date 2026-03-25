@@ -9,19 +9,15 @@ import { getDefaultFilterRange } from '../lib/dateUtils';
 export default function CarHandovers() {
   const { carHandovers, cars, users, currentUser, customRoles, deleteCarHandover } = useStore();
 
+  useEffect(() => {
+    initFirebaseSync(['cars', 'carHandovers']);
+  }, []);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHandover, setSelectedHandover] = useState<any>(null);
   const [filterCarId, setFilterCarId] = useState('');
   const [filterStartDate, setFilterStartDate] = useState(getDefaultFilterRange().start);
   const [filterEndDate, setFilterEndDate] = useState(getDefaultFilterRange().end);
-
-  useEffect(() => {
-    initFirebaseSync(['cars', 'carHandovers'], {
-      start: filterStartDate,
-      end: filterEndDate
-    });
-  }, [filterStartDate, filterEndDate]);
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const permissions = userRole?.permissions || [];

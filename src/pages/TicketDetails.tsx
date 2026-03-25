@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useStore, Ticket, TicketHistory, initFirebaseSync } from '../store';
+import { useStore, Ticket, TicketHistory } from '../store';
 import { 
   ArrowRight, 
   Trash2, 
@@ -40,10 +40,6 @@ export default function TicketDetails() {
     addNotification,
     restoreTicket
   } = useStore();
-
-  useEffect(() => {
-    initFirebaseSync(['tickets']);
-  }, []);
   
   const [commentText, setCommentText] = useState('');
   const [commentImage, setCommentImage] = useState<string | null>(null);

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useStore, initFirebaseSync } from '../store';
+import React, { useState } from 'react';
+import { useStore } from '../store';
 import { Download, Filter, Calendar, Building2, Package, Search, Eye, X, Printer, Trash2 } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
@@ -19,10 +19,6 @@ export default function WasteReport() {
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
-
-  useEffect(() => {
-    initFirebaseSync(['inventoryItems', 'inventoryReports'], filterDate);
-  }, [filterDate]);
 
   // 1. Filter Reports
   const filteredReports = inventoryReports.filter(r => {
