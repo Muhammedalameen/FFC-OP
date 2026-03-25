@@ -57,10 +57,10 @@ export const initFirebaseSync = async (
   }
 
   // 2. Unsubscribe from collections no longer needed
-  // We keep GLOBAL_COLLECTIONS always active
+  // We keep GLOBAL_COLLECTIONS always active if user is logged in
   const requiredCollections = currentUser 
     ? [...new Set([...GLOBAL_COLLECTIONS, ...targetCollections])]
-    : GLOBAL_COLLECTIONS;
+    : [];
 
   Object.keys(activeListeners).forEach(col => {
     if (!requiredCollections.includes(col)) {
@@ -272,7 +272,6 @@ export interface Car {
   name: string;
   model: string;
   plateNumber: string;
-  branchId?: string; // Optional: car can be assigned to a branch
 }
 
 export interface CarHandover {
@@ -337,7 +336,6 @@ export interface RevenueReport {
   createdBy: string;
   createdAt: string;
   images?: string[];
-  notes?: string;
   status: 'draft' | 'approved' | 'rejected' | 'pending';
 }
 
@@ -485,7 +483,6 @@ interface AppState {
   theme: 'light' | 'dark' | 'system';
   notifications: Notification[];
   isDbConnected: boolean | null;
-  dbConnectionError: string | null;
   syncStatuses: Record<string, SyncStatus>;
   
   // Actions
@@ -670,7 +667,6 @@ export const useStore = create<AppState>()(
       theme: 'system',
       notifications: [],
       isDbConnected: null,
-      dbConnectionError: null,
       syncStatuses: COLLECTIONS_TO_SYNC.reduce((acc, col) => {
         acc[col] = { status: 'idle', lastSynced: null };
         return acc;
@@ -691,20 +687,13 @@ export const useStore = create<AppState>()(
 
       checkDbConnection: async () => {
         try {
-          // Check if we can read from the users collection
-          // This verifies both connection and security rules
-          const colRef = collection(db, 'users');
-          await getDocs(query(colRef, limit(1)));
-          set({ isDbConnected: true, dbConnectionError: null });
-        } catch (error: any) {
+          // A simple query to check if Firestore is reachable
+          const docRef = doc(db, 'health_check', 'ping');
+          await setDoc(docRef, { timestamp: new Date().toISOString() });
+          set({ isDbConnected: true });
+        } catch (error) {
           console.error('Database connection check failed', error);
-          // If we get a permission error, it means the database is reachable but rules are blocking us.
-          // Since the app needs to read data to function, we treat this as a connection failure.
-          let errorMessage = 'تعذر الاتصال بقاعدة البيانات. يرجى التحقق من اتصالك بالإنترنت.';
-          if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
-            errorMessage = 'يوجد مشكلة في صلاحيات الوصول لقاعدة البيانات (Security Rules). يرجى التأكد من أن القواعد تسمح بالقراءة والكتابة.';
-          }
-          set({ isDbConnected: false, dbConnectionError: errorMessage });
+          set({ isDbConnected: false });
         }
       },
 
@@ -1134,7 +1123,7 @@ export const useStore = create<AppState>()(
         // Exclude all collections that are synced with Firebase to ensure each device
         // fetches its own data separately from the database on every load.
         const { 
-          currentUser, notifications, isDbConnected, dbConnectionError,
+          currentUser, notifications, isDbConnected,
           users, customRoles, branches, cars, inventoryItems,
           operationalItems, revenueReports, inventoryReports,
           inspectionReports, scheduledReadingItems, readingRecords,

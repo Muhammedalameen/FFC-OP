@@ -37,35 +37,6 @@ export default function Inventory() {
   const [items, setItems] = useState<InventoryReportItem[]>([]);
   const [importDate, setImportDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
 
-  // Initialize form state when adding or editing
-  useEffect(() => {
-    if (editingReportId) {
-      const report = inventoryReports.find(r => r.id === editingReportId);
-      if (report) {
-        setBranchId(report.branchId);
-        setDate(report.date);
-        setItems(report.items);
-        setAddStep(2);
-      }
-    }
-  }, [editingReportId]); // Only trigger when the report being edited changes
-
-  const getAvgConsumption = (itemId: string, bId: string) => {
-    const branchReports = inventoryReports
-      .filter(r => r.branchId === bId)
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 7);
-
-    if (branchReports.length < 2) return 0;
-
-    const consumptions = branchReports.map(r => {
-      const item = r.items.find(i => i.itemId === itemId);
-      return item ? item.consumption : 0;
-    });
-
-    return consumptions.reduce((a, b) => a + b, 0) / consumptions.length;
-  };
-
   const handleImportOpening = () => {
     if (!branchId || !importDate) return;
 

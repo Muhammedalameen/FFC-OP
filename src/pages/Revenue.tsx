@@ -33,22 +33,6 @@ export default function Revenue() {
   const [date, setDate] = useState(getDefaultReportDate());
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
   const [shifts, setShifts] = useState<Omit<ShiftRevenue, 'id'>[]>([{ cash: 0, pos: 0, delivery: 0, employeeName: '' }]);
-  const [notes, setNotes] = useState('');
-
-  // Initialize form state when editing
-  useEffect(() => {
-    if (editingReportId) {
-      const report = revenueReports.find(r => r.id === editingReportId);
-      if (report) {
-        setBranchId(report.branchId);
-        setDate(report.date);
-        setShifts(report.shifts);
-        setNotes(report.notes || '');
-        setIsAdding(true);
-        setAddStep(2);
-      }
-    }
-  }, [editingReportId]); // Only trigger when the report being edited changes
 
   const handleAddShift = () => {
     setShifts([...shifts, { cash: 0, pos: 0, delivery: 0, employeeName: '' }]);

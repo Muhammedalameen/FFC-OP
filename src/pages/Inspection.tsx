@@ -23,11 +23,6 @@ export default function Inspection() {
     initFirebaseSync(['operationalItems', 'inspectionReports'], filterDate);
   }, [filterDate]);
 
-  // Initialize form state when editing
-  // No useEffect needed for initializing form state from real-time data arrays
-  // as it causes data loss when Firebase updates.
-  // The form is initialized in onSubmit of step 1.
-
   const [isAdding, setIsAdding] = useState(false);
   const [addStep, setAddStep] = useState(1);
   const [date, setDate] = useState(getDefaultReportDate());

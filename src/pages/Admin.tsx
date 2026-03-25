@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem, initFirebaseSync } from '../store';
-import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car, Activity, CheckCircle2, XCircle, Loader2, Clock3, RefreshCw, AlertCircle, Database, Search, Edit2 } from 'lucide-react';
+import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car, Activity, CheckCircle2, XCircle, Loader2, Clock3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Cars from './admin/Cars';
 
@@ -1021,122 +1021,98 @@ export default function Admin() {
         {activeTab === 'sync' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <RefreshCw className="w-6 h-6 text-indigo-600" />
-                حالة المزامنة السحابية
-              </h2>
-              <button 
-                onClick={() => {
-                  const collections = [
-                    'users', 'customRoles', 'branches', 'cars', 'inventoryItems', 
-                    'operationalItems', 'revenueReports', 'inventoryReports', 
-                    'inspectionReports', 'scheduledReadingItems', 'readingRecords', 
-                    'tickets', 'carHandovers'
-                  ];
-                  initFirebaseSync(collections as any);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-bold shadow-lg shadow-indigo-500/20"
-              >
-                <RefreshCw size={18} />
-                تحديث الكل
-              </button>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">حالة المزامنة مع قاعدة البيانات</h2>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(syncStatuses).map(([collection, info]) => {
-                const collectionNamesAr: Record<string, string> = {
-                  users: 'المستخدمين',
-                  customRoles: 'الصلاحيات المخصصة',
-                  branches: 'الفروع',
-                  cars: 'السيارات',
-                  inventoryItems: 'أصناف المخزون',
-                  operationalItems: 'بنود التشغيل',
-                  revenueReports: 'تقارير الإيرادات',
-                  inventoryReports: 'تقارير المخزون والاحتياج والهدر',
-                  inspectionReports: 'تقارير التشغيل',
-                  scheduledReadingItems: 'بنود القراءات المجدولة',
-                  readingRecords: 'سجلات القراءات',
-                  tickets: 'طلبات الصيانة والشراء',
-                  carHandovers: 'استلام وتسليم السيارات'
-                };
-                
-                const arName = collectionNamesAr[collection] || collection;
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-right">
+                  <thead className="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-slate-700">
+                    <tr>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">القسم (Collection)</th>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">الحالة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">آخر مزامنة ناجحة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">تفاصيل الخطأ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {Object.entries(syncStatuses).map(([collection, info]) => {
+                      const collectionNamesAr: Record<string, string> = {
+                        users: 'المستخدمين',
+                        customRoles: 'الصلاحيات المخصصة',
+                        branches: 'الفروع',
+                        cars: 'السيارات',
+                        inventoryItems: 'أصناف المخزون',
+                        operationalItems: 'بنود التشغيل',
+                        revenueReports: 'تقارير الإيرادات',
+                        inventoryReports: 'تقارير المخزون والاحتياج والهدر',
+                        inspectionReports: 'تقارير التشغيل',
+                        scheduledReadingItems: 'بنود القراءات المجدولة',
+                        readingRecords: 'سجلات القراءات',
+                        tickets: 'طلبات الصيانة والشراء',
+                        carHandovers: 'استلام وتسليم السيارات'
+                      };
+                      
+                      const arName = collectionNamesAr[collection] || collection;
 
-                let StatusIcon = Clock3;
-                let statusColor = 'text-gray-500';
-                let statusBg = 'bg-gray-100 dark:bg-gray-800';
-                let statusText = 'خامل';
+                      let StatusIcon = Clock3;
+                      let statusColor = 'text-gray-500';
+                      let statusBg = 'bg-gray-100 dark:bg-gray-800';
+                      let statusText = 'في الانتظار';
 
-                switch (info.status) {
-                  case 'pending':
-                    StatusIcon = Clock3;
-                    statusColor = 'text-yellow-600 dark:text-yellow-400';
-                    statusBg = 'bg-yellow-50 dark:bg-yellow-900/20';
-                    statusText = 'في قائمة الانتظار';
-                    break;
-                  case 'syncing':
-                    StatusIcon = Loader2;
-                    statusColor = 'text-blue-600 dark:text-blue-400';
-                    statusBg = 'bg-blue-50 dark:bg-blue-900/20';
-                    statusText = 'جاري المزامنة...';
-                    break;
-                  case 'success':
-                    StatusIcon = CheckCircle2;
-                    statusColor = 'text-emerald-600 dark:text-emerald-400';
-                    statusBg = 'bg-emerald-50 dark:bg-emerald-900/20';
-                    statusText = 'متزامن';
-                    break;
-                  case 'error':
-                    StatusIcon = XCircle;
-                    statusColor = 'text-red-600 dark:text-red-400';
-                    statusBg = 'bg-red-50 dark:bg-red-900/20';
-                    statusText = 'فشل المزامنة';
-                    break;
-                }
+                      switch (info.status) {
+                        case 'pending':
+                          StatusIcon = Clock3;
+                          statusColor = 'text-yellow-600 dark:text-yellow-400';
+                          statusBg = 'bg-yellow-50 dark:bg-yellow-900/20';
+                          statusText = 'في قائمة الانتظار';
+                          break;
+                        case 'syncing':
+                          StatusIcon = Loader2;
+                          statusColor = 'text-blue-600 dark:text-blue-400';
+                          statusBg = 'bg-blue-50 dark:bg-blue-900/20';
+                          statusText = 'جاري المزامنة...';
+                          break;
+                        case 'success':
+                          StatusIcon = CheckCircle2;
+                          statusColor = 'text-emerald-600 dark:text-emerald-400';
+                          statusBg = 'bg-emerald-50 dark:bg-emerald-900/20';
+                          statusText = 'مكتملة';
+                          break;
+                        case 'error':
+                          StatusIcon = XCircle;
+                          statusColor = 'text-red-600 dark:text-red-400';
+                          statusBg = 'bg-red-50 dark:bg-red-900/20';
+                          statusText = 'فشل المزامنة';
+                          break;
+                      }
 
-                return (
-                  <div key={collection} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white">{arName}</h3>
-                        <p className="text-xs text-gray-400 font-mono" dir="ltr">{collection}</p>
-                      </div>
-                      <div className={`p-2 rounded-xl ${statusBg}`}>
-                        <StatusIcon size={20} className={info.status === 'syncing' ? 'animate-spin' : ''} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">الحالة:</span>
-                        <span className={`font-bold ${statusColor}`}>
-                          {statusText}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">آخر مزامنة:</span>
-                        <span className="text-gray-700 dark:text-gray-300 font-mono text-xs">
-                          {info.lastSynced ? new Date(info.lastSynced).toLocaleTimeString('ar-SA') : '---'}
-                        </span>
-                      </div>
-
-                      {info.error && (
-                        <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg text-[10px] text-red-600 dark:text-red-400 break-words">
-                          {info.error}
-                        </div>
-                      )}
-
-                      <button 
-                        onClick={() => initFirebaseSync([collection as any])}
-                        className="w-full mt-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors border border-indigo-100 dark:border-indigo-900/30"
-                      >
-                        مزامنة الآن
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                      return (
+                        <tr key={collection} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900 dark:text-white">{arName}</span>
+                              <span className="text-xs text-gray-500 dark:text-slate-400" dir="ltr">{collection}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusBg} ${statusColor}`}>
+                              <StatusIcon size={14} className={info.status === 'syncing' ? 'animate-spin' : ''} />
+                              {statusText}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">
+                            {info.lastSynced ? new Date(info.lastSynced).toLocaleString('ar-SA') : 'لم تتم المزامنة بعد'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={info.error}>
+                            {info.error || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
