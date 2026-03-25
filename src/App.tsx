@@ -22,15 +22,21 @@ import LoadingScreen from './components/LoadingScreen';
 import SyncProgressBar from './components/SyncProgressBar';
 import { useStore, initTursoSync, GLOBAL_COLLECTIONS } from './store';
 
-// Protected Route Component (Now optional)
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+// Protected Route Component
+const ProtectedRoute = ({ children, allowNoUsers = false }: { children: React.ReactNode, allowNoUsers?: boolean }) => {
   const currentUser = useStore((state) => state.currentUser);
-  // If there are no users in the system, allow access to set up the first user
   const users = useStore((state) => state.users);
   
-  if (!currentUser && users.length > 0) {
+  // If not logged in
+  if (!currentUser) {
+    // If we allow access when no users exist (for setup)
+    if (allowNoUsers && users.length === 0) {
+      return <>{children}</>;
+    }
+    // Otherwise redirect to login
     return <Navigate to="/login" replace />;
   }
+  
   return <>{children}</>;
 };
 
@@ -84,6 +90,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             
+            {/* Main App Routes - Strictly Protected */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
               <Route path="revenue" element={<Revenue />} />
@@ -100,7 +107,12 @@ export default function App() {
               <Route path="car-handovers" element={<CarHandovers />} />
               <Route path="car-handovers/new" element={<NewCarHandover />} />
               <Route path="car-handovers/return/:id" element={<ReturnCarHandover />} />
-              <Route path="admin/*" element={<Admin />} />
+            </Route>
+
+            {/* Admin Routes - Allowed if no users exist (for setup) */}
+            <Route path="/admin/*" element={<ProtectedRoute allowNoUsers={true}><Layout /></ProtectedRoute>}>
+              <Route index element={<Admin />} />
+              <Route path="*" element={<Admin />} />
             </Route>
           </Routes>
         </Router>
