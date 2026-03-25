@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, Ticket, initFirebaseSync } from '../store';
+import { useStore, Ticket, initTursoSync } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, MessageSquare, Image as ImageIcon, Paperclip, Calendar, Building2, Search, Filter, AlertCircle, Package, DollarSign } from 'lucide-react';
 import { format, isWithinInterval, parseISO } from 'date-fns';
@@ -15,9 +15,6 @@ export default function Tickets({ type }: TicketsProps) {
   const navigate = useNavigate();
   const { currentUser, customRoles, branches, users, tickets, addTicket, updateTicketStatus, addTicketComment, deleteTicket } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['tickets']);
-  }, []);
   const [isAdding, setIsAdding] = useState(false);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
@@ -48,6 +45,10 @@ export default function Tickets({ type }: TicketsProps) {
   const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    initTursoSync(['tickets'], filterDate);
+  }, [filterDate]);
 
   const titleText = type === 'maintenance' ? 'طلبات الصيانة' : 'طلبات الشراء';
   const newText = type === 'maintenance' ? 'طلب صيانة جديد' : 'طلب شراء جديد';

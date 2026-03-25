@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, initFirebaseSync } from '../store';
+import { useStore, initTursoSync } from '../store';
 import { Plus, Search, Car, Calendar, User, FileText, Eye, Trash2, Gauge, Fuel, Printer, ArrowLeftRight, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays, differenceInHours, differenceInMinutes } from 'date-fns';
@@ -9,15 +9,19 @@ import { getDefaultFilterRange } from '../lib/dateUtils';
 export default function CarHandovers() {
   const { carHandovers, cars, users, currentUser, customRoles, deleteCarHandover } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['cars', 'carHandovers']);
-  }, []);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHandover, setSelectedHandover] = useState<any>(null);
   const [filterCarId, setFilterCarId] = useState('');
   const [filterStartDate, setFilterStartDate] = useState(getDefaultFilterRange().start);
   const [filterEndDate, setFilterEndDate] = useState(getDefaultFilterRange().end);
+
+  useEffect(() => {
+    initTursoSync(['cars', 'carHandovers'], {
+      start: filterStartDate,
+      end: filterEndDate
+    });
+  }, [filterStartDate, filterEndDate]);
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const permissions = userRole?.permissions || [];

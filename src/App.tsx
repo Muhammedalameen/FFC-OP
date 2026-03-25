@@ -19,7 +19,8 @@ import CarHandovers from './pages/CarHandovers';
 import NewCarHandover from './pages/NewCarHandover';
 import ReturnCarHandover from './pages/ReturnCarHandover';
 import LoadingScreen from './components/LoadingScreen';
-import { useStore, initFirebaseSync, GLOBAL_COLLECTIONS } from './store';
+import SyncProgressBar from './components/SyncProgressBar';
+import { useStore, initTursoSync, GLOBAL_COLLECTIONS } from './store';
 
 // Protected Route Component (Now optional)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -34,13 +35,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
-  const { theme, checkDbConnection } = useStore();
+  const { theme, checkDbConnection, isLoading, syncProgress } = useStore();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   useEffect(() => {
     const init = async () => {
       await checkDbConnection();
-      await initFirebaseSync(GLOBAL_COLLECTIONS);
+      await initTursoSync(GLOBAL_COLLECTIONS);
       
       // Add a small delay to show the nice animation
       setTimeout(() => {
@@ -72,8 +73,10 @@ export default function App() {
 
   return (
     <>
+      <SyncProgressBar />
       <AnimatePresence>
         {isInitialLoading && <LoadingScreen message="جاري التحقق من الاتصال بقاعدة البيانات..." />}
+        {!isInitialLoading && isLoading && !syncProgress && <LoadingScreen message="جاري مزامنة البيانات..." />}
       </AnimatePresence>
 
       {!isInitialLoading && (

@@ -22,22 +22,27 @@ export default function Login() {
     setIsChecking(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDbConnected === false) return;
     
     setIsLoggingIn(true);
     
     // Simulate network delay for the loading screen
-    setTimeout(() => {
-      const success = login(employeeId, pin, rememberMe);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    try {
+      const success = await login(employeeId, pin, rememberMe);
       if (success) {
         navigate('/');
       } else {
         setError('الرقم الوظيفي أو كود الدخول غير صحيح');
         setIsLoggingIn(false);
       }
-    }, 1500);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('حدث خطأ أثناء تسجيل الدخول');
+      setIsLoggingIn(false);
+    }
   };
 
   return (
@@ -76,6 +81,26 @@ export default function Login() {
           <p className="text-indigo-100 font-medium">شركة سريع الغذائية</p>
         </div>
         
+        {isDbConnected === false ? (
+          <div className="p-10 text-center space-y-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full text-red-600 dark:text-red-400 mb-4 mx-auto">
+              <AlertTriangle size={40} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">النظام غير متصل</h2>
+            <p className="text-gray-600 dark:text-slate-400 leading-relaxed">
+              تعذر الاتصال بقاعدة البيانات. يرجى التحقق من اتصالك بالإنترنت أو المحاولة مرة أخرى لاحقاً.
+            </p>
+            <button
+              type="button"
+              onClick={handleCheckConnection}
+              disabled={isChecking}
+              className="w-full flex items-center justify-center gap-2 py-4 px-6 border border-transparent rounded-2xl shadow-lg shadow-indigo-500/20 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-5 w-5 ${isChecking ? 'animate-spin' : ''}`} />
+              {isChecking ? 'جاري التحقق...' : 'إعادة محاولة الاتصال'}
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="p-10 space-y-8">
           {noUsers && (
             <motion.div 
@@ -106,36 +131,6 @@ export default function Login() {
           )}
 
           <AnimatePresence mode="wait">
-            {isDbConnected === false && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-4 overflow-hidden"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-xl text-amber-600 dark:text-amber-400">
-                    <AlertTriangle size={20} />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200 mb-1">فشل الاتصال بقاعدة البيانات</h3>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed mb-3">
-                      لا يمكن تسجيل الدخول حالياً بسبب وجود مشكلة في الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت أو المحاولة مرة أخرى.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleCheckConnection}
-                      disabled={isChecking}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
-                    >
-                      <RefreshCw size={14} className={isChecking ? 'animate-spin' : ''} />
-                      {isChecking ? 'جاري التحقق...' : 'إعادة محاولة الاتصال'}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
             {isDbConnected === true && (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
@@ -209,10 +204,10 @@ export default function Login() {
           </div>
 
           <motion.button
-            whileHover={isDbConnected !== false ? { scale: 1.02 } : {}}
-            whileTap={isDbConnected !== false ? { scale: 0.98 } : {}}
+            whileHover={isDbConnected !== null ? { scale: 1.02 } : {}}
+            whileTap={isDbConnected !== null ? { scale: 0.98 } : {}}
             type="submit"
-            disabled={isDbConnected === false || isDbConnected === null}
+            disabled={isDbConnected === null}
             className="w-full flex items-center justify-center gap-2 py-4 px-6 border border-transparent rounded-2xl shadow-lg shadow-indigo-500/20 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDbConnected === null ? (
@@ -228,6 +223,7 @@ export default function Login() {
             )}
           </motion.button>
         </form>
+        )}
       </motion.div>
     </div>
     </>

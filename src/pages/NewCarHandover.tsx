@@ -1,10 +1,14 @@
-import React, { useState, useRef } from 'react';
-import { useStore } from '../store';
+import React, { useState, useRef, useEffect } from 'react';
+import { useStore, initTursoSync } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Upload, X, Save, ArrowRight, Car, Calendar, FileText, Gauge, Fuel } from 'lucide-react';
 
 export default function NewCarHandover() {
   const { cars, currentUser, addCarHandover } = useStore();
+  
+  useEffect(() => {
+    initTursoSync(['cars']);
+  }, []);
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, InventoryReportItem, initFirebaseSync } from '../store';
+import { useStore, InventoryReportItem, initTursoSync } from '../store';
 import { Plus, Trash2, Save, Download, Filter, Calendar, Building2, Package, AlertTriangle, Eye, Printer, X, FileText, Edit, FileEdit } from 'lucide-react';
 import { format, subDays, isWithinInterval, parseISO, isAfter } from 'date-fns';
 import { exportToXLSX, exportToPDF, printReport } from '../lib/exportUtils';
@@ -9,38 +9,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Inventory() {
   const { currentUser, customRoles, branches, inventoryItems, inventoryReports, addInventoryReport, updateInventoryReport, deleteInventoryReport, addNotification, restoreInventoryReport } = useStore();
-
-  useEffect(() => {
-    initFirebaseSync(['inventoryItems', 'inventoryReports']);
-  }, []);
-  const [isAdding, setIsAdding] = useState(false);
-  const [addStep, setAddStep] = useState(1);
-  const [editingReportId, setEditingReportId] = useState<string | null>(null);
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-  
-  // Form State
-  const [date, setDate] = useState(getDefaultReportDate());
-  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
-  const [items, setItems] = useState<InventoryReportItem[]>([]);
-  const [importDate, setImportDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
-
-  // Calculate average consumption for an item in a branch
-  const getAvgConsumption = (itemId: string, bId: string) => {
-    // Filter reports for this branch from the last 30 days to get a good average
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const relevantReports = inventoryReports.filter(r => 
-      r.branchId === bId && isAfter(parseISO(r.date), thirtyDaysAgo)
-    );
-    
-    if (relevantReports.length === 0) return 0;
-    
-    const totalCons = relevantReports.reduce((sum, r) => {
-      const item = r.items.find(i => i.itemId === itemId);
-      return sum + (item?.consumption || 0);
-    }, 0);
-    
-    return totalCons / relevantReports.length;
-  };
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const permissions = userRole?.permissions || [];
@@ -53,6 +21,39 @@ export default function Inventory() {
   // Filter State
   const [filterDate, setFilterDate] = useState(getDefaultFilterRange());
   const [filterBranch, setFilterBranch] = useState(canViewAll ? 'all' : currentUser?.branchId || '');
+
+  useEffect(() => {
+    initTursoSync(['inventoryItems', 'inventoryReports'], filterDate);
+  }, [filterDate]);
+
+  const [isAdding, setIsAdding] = useState(false);
+  const [addStep, setAddStep] = useState(1);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  
+  // Form State
+  const [date, setDate] = useState(getDefaultReportDate());
+  const [branchId, setBranchId] = useState(currentUser?.branchId || branches[0]?.id || '');
+  const [items, setItems] = useState<InventoryReportItem[]>([]);
+  const [importDate, setImportDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
+
+  const getAvgConsumption = (itemId: string, branchId: string) => {
+    const reports = inventoryReports.filter(r => r.branchId === branchId);
+    if (reports.length === 0) return 0;
+    
+    let totalConsumption = 0;
+    let count = 0;
+    
+    reports.forEach(report => {
+      const item = report.items.find(i => i.itemId === itemId);
+      if (item && item.consumption > 0) {
+        totalConsumption += item.consumption;
+        count++;
+      }
+    });
+    
+    return count > 0 ? totalConsumption / count : 0;
+  };
 
   const handleImportOpening = () => {
     if (!branchId || !importDate) return;

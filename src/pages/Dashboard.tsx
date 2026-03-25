@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useStore, initFirebaseSync } from '../store';
+import { useStore, initTursoSync } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { Activity, DollarSign, Package, Wrench, Calendar, Building2, Filter, Clock, CheckCircle2, AlertCircle, User } from 'lucide-react';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
@@ -9,13 +9,14 @@ import { cn } from '../lib/utils';
 export default function Dashboard() {
   const { currentUser, customRoles, branches, revenueReports, inventoryReports, tickets, scheduledReadingItems, readingRecords, users } = useStore();
 
-  useEffect(() => {
-    initFirebaseSync(['revenueReports', 'inventoryReports', 'tickets', 'scheduledReadingItems', 'readingRecords']);
-  }, []);
   const navigate = useNavigate();
   
   const [dateRange, setDateRange] = useState(getDefaultFilterRange());
   const [selectedBranch, setSelectedBranch] = useState('all');
+
+  useEffect(() => {
+    initTursoSync(['revenueReports', 'inventoryReports', 'tickets', 'scheduledReadingItems', 'readingRecords'], dateRange);
+  }, [dateRange]);
 
   const userRole = customRoles.find(r => r.id === currentUser?.roleId);
   const canViewAll = userRole?.permissions.includes('view_all_branches');

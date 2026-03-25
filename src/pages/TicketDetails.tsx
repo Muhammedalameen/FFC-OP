@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useStore, Ticket, TicketHistory } from '../store';
+import { useStore, Ticket, TicketHistory, initTursoSync } from '../store';
 import { 
   ArrowRight, 
   Trash2, 
@@ -40,6 +40,10 @@ export default function TicketDetails() {
     addNotification,
     restoreTicket
   } = useStore();
+
+  useEffect(() => {
+    initTursoSync(['tickets']);
+  }, []);
   
   const [commentText, setCommentText] = useState('');
   const [commentImage, setCommentImage] = useState<string | null>(null);

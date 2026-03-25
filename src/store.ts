@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { format } from 'date-fns';
-import { doc, getDoc, setDoc, onSnapshot, collection, query, limit, where, deleteDoc, getDocs } from 'firebase/firestore';
-import { db } from './lib/firebase';
 
 const COLLECTIONS_TO_SYNC = [
   'users', 'customRoles', 'branches', 'cars', 'inventoryItems', 
@@ -11,39 +9,57 @@ const COLLECTIONS_TO_SYNC = [
   'tickets', 'carHandovers'
 ];
 
-let isFirebaseInitialized = false;
-const firebaseLoadedCollections = new Set<string>();
-let isReceivingFromFirebase = false;
+let isTursoInitialized = false;
+const tursoLoadedCollections = new Set<string>();
+let isReceivingFromTurso = false;
 
-let activeListeners: Record<string, () => void> = {};
+let activeListeners: Record<string, NodeJS.Timeout> = {};
+let activeQueries: Record<string, string> = {};
 let isLocalListenerInitialized = false;
 
 export const GLOBAL_COLLECTIONS = ['users', 'customRoles', 'branches'];
 
-export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLLECTIONS) => {
+const API_BASE = '/api';
+
+export const initTursoSync = async (
+  targetCollections: string[] = GLOBAL_COLLECTIONS,
+  dateRange?: { start: string, end: string }
+) => {
   const state = useStore.getState();
   const currentUser = state.currentUser;
   
+  // Set loading only if we are actually loading new collections
+  const requiredCollections = currentUser 
+    ? [...new Set([...GLOBAL_COLLECTIONS, ...targetCollections])]
+    : [...GLOBAL_COLLECTIONS];
+    
+  const needsLoading = requiredCollections.some(col => !tursoLoadedCollections.has(col));
+  if (needsLoading) {
+    state.setIsLoading(true);
+  }
+  
   // 1. Migration & Initial push (only once for the whole system)
-  if (!isFirebaseInitialized) {
-    isFirebaseInitialized = true; // Set early to prevent parallel migration attempts
-    for (const col of COLLECTIONS_TO_SYNC) {
-      const oldDocRef = doc(db, 'system_data', col);
+  if (!isTursoInitialized) {
+    isTursoInitialized = true; 
+    // Initial fetch of global collections
+    for (const col of GLOBAL_COLLECTIONS) {
       try {
-        const docSnap = await getDoc(oldDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data().data;
-          if (Array.isArray(data)) {
-            await Promise.all(data.map((item: any) => setDoc(doc(db, col, item.id), item)));
-            await deleteDoc(oldDocRef);
-            console.log(`Migrated ${col} to new structure`);
-          }
-        } else {
-          const colRef = collection(db, col);
-          const snap = await getDocs(query(colRef, limit(1)));
+        const res = await fetch(`${API_BASE}/${col}`);
+        if (res.ok) {
+          const remoteData = await res.json();
           const localData = state[col as keyof AppState];
-          if (snap.empty && Array.isArray(localData) && localData.length > 0) {
-            await Promise.all(localData.map((item: any) => setDoc(doc(db, col, item.id), item)));
+          
+          if (remoteData.length === 0 && Array.isArray(localData) && localData.length > 0) {
+            // Push local to remote if remote is empty
+            state.setIsLoading(true);
+            await Promise.all(localData.map((item: any) => 
+              fetch(`${API_BASE}/${col}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+              })
+            ));
+            state.setIsLoading(false);
           }
         }
       } catch (e) {
@@ -53,111 +69,192 @@ export const initFirebaseSync = async (targetCollections: string[] = GLOBAL_COLL
   }
 
   // 2. Unsubscribe from collections no longer needed
-  // We keep GLOBAL_COLLECTIONS always active if user is logged in
-  const requiredCollections = currentUser 
-    ? [...new Set([...GLOBAL_COLLECTIONS, ...targetCollections])]
-    : [];
-
+  // We keep GLOBAL_COLLECTIONS always active
   Object.keys(activeListeners).forEach(col => {
     if (!requiredCollections.includes(col)) {
-      activeListeners[col]();
+      clearInterval(activeListeners[col]);
       delete activeListeners[col];
-      firebaseLoadedCollections.delete(col);
+      delete activeQueries[col];
+      tursoLoadedCollections.delete(col);
       console.log(`Unsubscribed from ${col}`);
     }
   });
 
-  // 3. Listen to Firebase changes (Real-time sync)
+  // 3. Listen to Turso changes (Polling for now)
   requiredCollections.forEach(col => {
-    if (activeListeners[col]) return; // Already subscribed
-
-    const colRef = collection(db, col);
-    let q = query(colRef);
     
     // Apply branch filter for branch managers
     const userRole = state.customRoles.find(r => r.id === currentUser?.roleId);
     const canViewAll = userRole?.permissions.includes('view_all_branches');
     
+    let queryParams: any = { branchId: canViewAll ? 'all' : currentUser?.branchId };
+
     if (!canViewAll && currentUser?.branchId) {
       const branchCollections = ['revenueReports', 'inventoryReports', 'inspectionReports', 'tickets', 'carHandovers', 'readingRecords'];
       if (branchCollections.includes(col)) {
-        q = query(colRef, where('branchId', '==', currentUser.branchId));
+        queryParams.branchId = currentUser.branchId;
       }
     }
 
-    const unsub = onSnapshot(q, (snapshot) => {
-      const remoteData = snapshot.docs.map(doc => doc.data());
-      const localData = useStore.getState()[col as keyof AppState];
-      
-      firebaseLoadedCollections.add(col);
-      
-      // Single session check for users collection
-      if (col === 'users') {
-        const state = useStore.getState();
-        if (state.currentUser) {
-          const remoteUser = remoteData.find((u: any) => u.id === state.currentUser?.id);
-          if (remoteUser && remoteUser.sessionId && remoteUser.sessionId !== state.currentSessionId) {
-            // New session detected elsewhere
-            state.logout();
-            state.addNotification('تم تسجيل الدخول من جهاز آخر، تم تسجيل خروجك تلقائياً', 'info');
-            return;
+    // Apply date filter if provided
+    if (dateRange && ['revenueReports', 'inventoryReports', 'inspectionReports', 'tickets', 'readingRecords'].includes(col)) {
+      queryParams.dateRange = dateRange;
+    } else if (dateRange && col === 'carHandovers') {
+      queryParams.dateRange = dateRange;
+    }
+
+    const queryKey = JSON.stringify(queryParams);
+
+    if (activeListeners[col]) {
+      if (activeQueries[col] === queryKey) {
+        // If already loaded and query hasn't changed, we don't need to wait for it
+        return; 
+      } else {
+        // Query changed, unsubscribe first
+        clearInterval(activeListeners[col]);
+        console.log(`Query changed for ${col}, resubscribing...`);
+      }
+    }
+
+    activeQueries[col] = queryKey;
+
+    const fetchRemoteData = async (isInitial = false) => {
+      try {
+        const res = await fetch(`${API_BASE}/${col}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        let remoteData = await res.json();
+        
+        // Apply client-side filtering since our basic API returns all
+        if (queryParams.branchId && queryParams.branchId !== 'all') {
+          remoteData = remoteData.filter((item: any) => item.branchId === queryParams.branchId);
+        }
+        if (queryParams.dateRange) {
+           if (col === 'carHandovers') {
+             remoteData = remoteData.filter((item: any) => item.createdAt >= queryParams.dateRange.start && item.createdAt <= queryParams.dateRange.end + 'T23:59:59');
+           } else {
+             remoteData = remoteData.filter((item: any) => item.date >= queryParams.dateRange.start && item.date <= queryParams.dateRange.end);
+           }
+        }
+
+        const localData = useStore.getState()[col as keyof AppState];
+        
+        tursoLoadedCollections.add(col);
+        
+        // Check if all required collections are loaded
+        const allLoaded = requiredCollections.every(c => tursoLoadedCollections.has(c));
+        if (allLoaded) {
+          useStore.getState().setIsLoading(false);
+        }
+        
+        // Single session check for users collection
+        if (col === 'users') {
+          const state = useStore.getState();
+          if (state.currentUser) {
+            const remoteUser = remoteData.find((u: any) => u.id === state.currentUser?.id);
+            if (remoteUser && remoteUser.sessionId && remoteUser.sessionId !== state.currentSessionId) {
+              // New session detected elsewhere
+              state.logout();
+              state.addNotification('تم تسجيل الدخول من جهاز آخر، تم تسجيل خروجك تلقائياً', 'info');
+              return;
+            }
           }
         }
+        
+        if (JSON.stringify(remoteData) !== JSON.stringify(localData)) {
+          isReceivingFromTurso = true;
+          useStore.setState({ [col]: remoteData } as any);
+          isReceivingFromTurso = false;
+        }
+      } catch (error) {
+        console.error(`Error fetching ${col}:`, error);
+        useStore.getState().setIsLoading(false);
       }
-      
-      if (JSON.stringify(remoteData) !== JSON.stringify(localData)) {
-        isReceivingFromFirebase = true;
-        useStore.setState({ [col]: remoteData } as any);
-        isReceivingFromFirebase = false;
-      }
-    }, (error) => {
-      console.error(`Error listening to ${col}:`, error);
-    });
+    };
+
+    // Initial fetch
+    fetchRemoteData(true);
     
-    activeListeners[col] = unsub;
+    // Poll every 5 seconds
+    const interval = setInterval(fetchRemoteData, 5000);
+    activeListeners[col] = interval;
     console.log(`Subscribed to ${col}`);
   });
 
-  // 3. Listen to local changes and push to Firebase
+  if (requiredCollections.length === 0 || requiredCollections.every(c => tursoLoadedCollections.has(c))) {
+    state.setIsLoading(false);
+  }
+
+  // 3. Listen to local changes and push to Turso
   if (!isLocalListenerInitialized) {
     isLocalListenerInitialized = true;
     const syncTimeouts: Record<string, NodeJS.Timeout> = {};
+    const baseStates: Record<string, any[]> = {}; // Store the state before changes started
     
     useStore.subscribe((state, prevState) => {
       COLLECTIONS_TO_SYNC.forEach(col => {
-        if (!firebaseLoadedCollections.has(col)) return;
+        if (!tursoLoadedCollections.has(col)) return;
 
-        const localData = state[col as keyof AppState];
-        const prevLocalData = prevState[col as keyof AppState];
+        const localData = state[col as keyof AppState] as any[];
+        const prevLocalData = prevState[col as keyof AppState] as any[];
         
-        if (localData !== prevLocalData && !isReceivingFromFirebase && Array.isArray(localData) && Array.isArray(prevLocalData)) {
+        if (localData !== prevLocalData && !isReceivingFromTurso && Array.isArray(localData) && Array.isArray(prevLocalData)) {
+          // If no timeout is active, this is the first change in a batch
+          if (!syncTimeouts[col]) {
+            baseStates[col] = prevLocalData;
+          }
+
           if (syncTimeouts[col]) {
             clearTimeout(syncTimeouts[col]);
           }
           
+          state.setIsLoading(true);
           state.setSyncStatus(col, 'pending');
           
           syncTimeouts[col] = setTimeout(() => {
-            state.setSyncStatus(col, 'syncing');
+            const baseData = baseStates[col] || prevLocalData;
+            delete baseStates[col];
+            delete syncTimeouts[col];
             
-            const added = localData.filter((item: any) => !prevLocalData.find((p: any) => p.id === item.id));
+            const added = localData.filter((item: any) => !baseData.find((p: any) => p.id === item.id));
             const updated = localData.filter((item: any) => {
-              const prev = prevLocalData.find((p: any) => p.id === item.id);
+              const prev = baseData.find((p: any) => p.id === item.id);
               return prev && JSON.stringify(prev) !== JSON.stringify(item);
             });
-            const deleted = prevLocalData.filter((item: any) => !localData.find((p: any) => p.id === item.id));
+            const deleted = baseData.filter((item: any) => !localData.find((p: any) => p.id === item.id));
 
             const promises = [
-              ...added.map((item: any) => setDoc(doc(db, col, item.id), item)),
-              ...updated.map((item: any) => setDoc(doc(db, col, item.id), item)),
-              ...deleted.map((item: any) => deleteDoc(doc(db, col, item.id)))
+              ...added.map((item: any) => fetch(`${API_BASE}/${col}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) })),
+              ...updated.map((item: any) => fetch(`${API_BASE}/${col}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) })),
+              ...deleted.map((item: any) => fetch(`${API_BASE}/${col}/${item.id}`, { method: 'DELETE' }))
             ];
 
-            Promise.all(promises).then(() => {
+            if (promises.length === 0) {
               useStore.getState().setSyncStatus(col, 'success');
+              useStore.getState().setIsLoading(false);
+              return;
+            }
+
+            state.setSyncStatus(col, 'syncing');
+            const total = promises.length;
+            let current = 0;
+            
+            state.setSyncProgress({ current: 0, total });
+
+            const trackProgress = (p: Promise<any>) => p.then(res => {
+              current++;
+              useStore.getState().setSyncProgress({ current, total });
+              return res;
+            });
+
+            Promise.all(promises.map(trackProgress)).then(() => {
+              useStore.getState().setSyncStatus(col, 'success');
+              useStore.getState().setIsLoading(false);
+              useStore.getState().setSyncProgress(null);
             }).catch(e => {
-              console.error(`Error saving ${col} to Firebase:`, e);
+              console.error(`Error saving ${col} to Turso:`, e);
               useStore.getState().setSyncStatus(col, 'error', e.message);
+              useStore.getState().setIsLoading(false);
+              useStore.getState().setSyncProgress(null);
             });
           }, 1000);
         }
@@ -244,6 +341,7 @@ export interface Car {
   name: string;
   model: string;
   plateNumber: string;
+  branchId?: string;
 }
 
 export interface CarHandover {
@@ -456,11 +554,15 @@ interface AppState {
   notifications: Notification[];
   isDbConnected: boolean | null;
   syncStatuses: Record<string, SyncStatus>;
+  isLoading: boolean;
+  syncProgress: { current: number, total: number } | null;
   
   // Actions
+  setIsLoading: (loading: boolean) => void;
+  setSyncProgress: (progress: { current: number, total: number } | null) => void;
   setSyncStatus: (collection: string, status: SyncStatusType, error?: string) => void;
   checkDbConnection: () => Promise<void>;
-  login: (employeeId: string, pin: string, rememberMe?: boolean) => boolean;
+  login: (employeeId: string, pin: string, rememberMe?: boolean) => Promise<boolean>;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info', duration?: number, undoAction?: () => void) => void;
@@ -487,6 +589,7 @@ interface AppState {
   addInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
+  deleteBranchInventoryItems: (branchId: string) => void;
   deleteAllInventoryItems: () => void;
   copyInventoryItems: (fromBranchId: string, toBranchId: string) => void;
   
@@ -643,6 +746,11 @@ export const useStore = create<AppState>()(
         acc[col] = { status: 'idle', lastSynced: null };
         return acc;
       }, {} as Record<string, SyncStatus>),
+      isLoading: false,
+      syncProgress: null,
+
+      setIsLoading: (loading: boolean) => set({ isLoading: loading }),
+      setSyncProgress: (progress) => set({ syncProgress: progress }),
 
       setSyncStatus: (collection, status, error) => {
         set((state) => ({
@@ -658,18 +766,23 @@ export const useStore = create<AppState>()(
       },
 
       checkDbConnection: async () => {
+        get().setIsLoading(true);
         try {
-          // A simple query to check if Firestore is reachable
-          const docRef = doc(db, 'health_check', 'ping');
-          await setDoc(docRef, { timestamp: new Date().toISOString() });
-          set({ isDbConnected: true });
+          const res = await fetch('/api/health/ping');
+          if (res.ok) {
+            set({ isDbConnected: true });
+          } else {
+            set({ isDbConnected: false });
+          }
         } catch (error) {
           console.error('Database connection check failed', error);
           set({ isDbConnected: false });
+        } finally {
+          get().setIsLoading(false);
         }
       },
 
-      login: (employeeId, pin, rememberMe) => {
+      login: async (employeeId, pin, rememberMe) => {
         const user = get().users.find(u => u.employeeId === employeeId && u.pin === pin);
         if (user) {
           const sessionId = generateId();
@@ -690,10 +803,21 @@ export const useStore = create<AppState>()(
             localStorage.removeItem('restaurant_session_user');
           }
           
-          // Update user in Firestore immediately to invalidate other sessions
-          setDoc(doc(db, 'users', user.id), updatedUser);
+          // Update user in Turso immediately to invalidate other sessions
+          get().setIsLoading(true);
+          try {
+            await fetch(`/api/users/${user.id}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedUser)
+            });
+          } catch (e) {
+            console.error('Error updating session in Turso:', e);
+          } finally {
+            get().setIsLoading(false);
+          }
           
-          initFirebaseSync();
+          initTursoSync();
           return true;
         }
         return false;
@@ -719,7 +843,7 @@ export const useStore = create<AppState>()(
         localStorage.removeItem('restaurant_remember_me');
         localStorage.removeItem('restaurant_session_user');
         sessionStorage.removeItem('restaurant_session_id');
-        initFirebaseSync();
+        initTursoSync();
       },
       setTheme: (theme) => set({ theme }),
       addNotification: (message, type, duration = 3000, undoAction) => {
@@ -801,6 +925,19 @@ export const useStore = create<AppState>()(
       deleteInventoryItem: (id) => {
         set((state) => ({ inventoryItems: state.inventoryItems.filter(i => i.id !== id) }));
         get().addNotification('تم حذف الصنف', 'success');
+      },
+      deleteBranchInventoryItems: (branchId) => {
+        set((state) => {
+          const updatedItems = state.inventoryItems.map(item => {
+            if (item.branchIds.includes(branchId)) {
+              return { ...item, branchIds: item.branchIds.filter(id => id !== branchId) };
+            }
+            return item;
+          }).filter(item => item.branchIds.length > 0);
+          
+          return { inventoryItems: updatedItems };
+        });
+        get().addNotification('تم حذف جميع أصناف الفرع بنجاح', 'success');
       },
       deleteAllInventoryItems: () => {
         set({ inventoryItems: [] });
@@ -1092,7 +1229,7 @@ export const useStore = create<AppState>()(
     {
       name: 'restaurant-system-storage',
       partialize: (state) => {
-        // Exclude all collections that are synced with Firebase to ensure each device
+        // Exclude all collections that are synced with Turso to ensure each device
         // fetches its own data separately from the database on every load.
         const { 
           currentUser, notifications, isDbConnected,

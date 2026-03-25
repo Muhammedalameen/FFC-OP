@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useStore } from '../store';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useStore, initTursoSync } from '../store';
 import { TrendingUp, Package, DollarSign, Calendar, BarChart3, ArrowUpRight, ArrowDownRight, Filter, Building2, Printer, Check, Clock, X } from 'lucide-react';
 import { 
   format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, 
@@ -60,6 +60,13 @@ export default function Reports() {
         return { start: startOfMonth(now), end: endOfDay(now) };
     }
   }, [appliedDateFilter, appliedCustomRange]);
+
+  useEffect(() => {
+    initTursoSync(['inventoryItems', 'inventoryReports'], {
+      start: format(dateRange.start, 'yyyy-MM-dd'),
+      end: format(dateRange.end, 'yyyy-MM-dd')
+    });
+  }, [dateRange]);
 
   const stats = useMemo(() => {
     const filteredInventory = inventoryReports.filter(r => {

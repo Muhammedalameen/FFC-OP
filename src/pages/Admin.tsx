@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem, initFirebaseSync } from '../store';
+import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem, initTursoSync } from '../store';
 import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car, Activity, CheckCircle2, XCircle, Loader2, Clock3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Cars from './admin/Cars';
@@ -10,14 +10,14 @@ export default function Admin() {
     users, addUser, updateUser, deleteUser,
     branches, addBranch, updateBranch, deleteBranch,
     operationalItems, addOperationalItem, updateOperationalItem, deleteOperationalItem,
-    inventoryItems, addInventoryItem, addInventoryItems, updateInventoryItem, deleteInventoryItem, deleteAllInventoryItems, copyInventoryItems,
+    inventoryItems, addInventoryItem, addInventoryItems, updateInventoryItem, deleteInventoryItem, deleteBranchInventoryItems, deleteAllInventoryItems, copyInventoryItems,
     addCustomRole, updateCustomRole, deleteCustomRole,
     scheduledReadingItems, addScheduledReadingItem, updateScheduledReadingItem, deleteScheduledReadingItem,
-    syncStatuses
+    syncStatuses, syncProgress, setSyncProgress
   } = useStore();
 
   useEffect(() => {
-    initFirebaseSync(['inventoryItems', 'operationalItems', 'scheduledReadingItems', 'cars']);
+    initTursoSync(['inventoryItems', 'operationalItems', 'scheduledReadingItems', 'cars']);
   }, []);
 
   const [activeTab, setActiveTab] = useState<'users' | 'branches' | 'operational' | 'inventory' | 'roles' | 'scheduled' | 'cars' | 'sync'>('users');
@@ -54,7 +54,6 @@ export default function Admin() {
   // Copy Inventory State
   const [copySource, setCopySource] = useState('');
   const [copyTarget, setCopyTarget] = useState('');
-  const [importProgress, setImportProgress] = useState<{current: number, total: number} | null>(null);
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const canManage = userRole?.permissions.includes('manage_system') || users.length === 0;
@@ -224,34 +223,47 @@ export default function Admin() {
           return;
         }
 
-        setImportProgress({ current: 0, total: validItems.length });
-        
-        const CHUNK_SIZE = 50;
-        for (let i = 0; i < validItems.length; i += CHUNK_SIZE) {
-          if (abortImportRef.current) {
-            alert('تم إيقاف الاستيراد.');
-            break;
+        // Filter out duplicates by name in the current branch
+        const existingInBranchNames = new Set(
+          inventoryItems
+            .filter(item => item.branchIds.includes(selectedBranchId))
+            .map(item => item.name.trim().toLowerCase())
+        );
+        const uniqueItemsToAdd: Omit<InventoryItem, 'id'>[] = [];
+        let duplicateCount = 0;
+        const seenInFile = new Set<string>();
+
+        validItems.forEach(item => {
+          const nameKey = item.name.toLowerCase();
+          if (existingInBranchNames.has(nameKey) || seenInFile.has(nameKey)) {
+            duplicateCount++;
+          } else {
+            seenInFile.add(nameKey);
+            uniqueItemsToAdd.push(item);
           }
-          const chunk = validItems.slice(i, i + CHUNK_SIZE);
-          addInventoryItems(chunk);
-          setImportProgress({ current: Math.min(i + CHUNK_SIZE, validItems.length), total: validItems.length });
-          // A small delay to allow UI to update and Firebase to sync
-          await new Promise(resolve => setTimeout(resolve, 300));
+        });
+
+        if (uniqueItemsToAdd.length === 0) {
+          alert(`تم تجاهل كافة الأصناف (${duplicateCount}) لأنها موجودة مسبقاً في هذا الفرع.`);
+          return;
         }
+
+        // Add all items at once to ensure they are synced as a single batch
+        addInventoryItems(uniqueItemsToAdd);
         
         if (!abortImportRef.current) {
           setTimeout(() => {
-            setImportProgress(null);
-            alert(`تم استيراد ${validItems.length} صنف بنجاح`);
+            let message = `تم استيراد ${uniqueItemsToAdd.length} صنف بنجاح.`;
+            if (duplicateCount > 0) {
+              message += `\nتم تجاهل ${duplicateCount} صنف لأنها موجودة مسبقاً في هذا الفرع.`;
+            }
+            alert(message);
           }, 500);
-        } else {
-          setImportProgress(null);
         }
 
       } catch (error) {
         console.error('Error parsing Excel file:', error);
         alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
-        setImportProgress(null);
       }
       
       // Reset input
@@ -828,7 +840,7 @@ export default function Admin() {
                           onClick={() => {
                             if (window.confirm('هل أنت متأكد من رغبتك في حذف جميع أصناف المخزون؟ هذا الإجراء لا يمكن التراجع عنه وسيحذف جميع الأصناف من كافة الفروع.')) {
                               abortImportRef.current = true;
-                              setImportProgress(null); // Stop any ongoing import progress UI
+                              setSyncProgress(null); // Stop any ongoing import progress UI
                               deleteAllInventoryItems();
                             }
                           }}
@@ -870,26 +882,15 @@ export default function Admin() {
                       className="hidden" 
                       id="excel-upload" 
                       ref={fileInputRef}
-                      disabled={importProgress !== null}
+                      disabled={syncProgress !== null}
                     />
                     <label 
                       htmlFor="excel-upload" 
-                      className={`cursor-pointer px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors border ${importProgress ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50'}`}
+                      className={`cursor-pointer px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors border ${syncProgress ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50'}`}
                     >
                       <Upload size={18} />
-                      <span className="hidden sm:inline">{importProgress ? 'جاري الاستيراد...' : 'استيراد من Excel'}</span>
+                      <span className="hidden sm:inline">{syncProgress ? 'جاري الاستيراد...' : 'استيراد من Excel'}</span>
                     </label>
-                    {importProgress && (
-                      <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5 mt-2 overflow-hidden">
-                        <div 
-                          className="bg-emerald-600 h-2.5 rounded-full transition-all duration-300" 
-                          style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-                        ></div>
-                        <p className="text-xs text-gray-500 dark:text-slate-400 text-center mt-1">
-                          {importProgress.current} / {importProgress.total}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -952,6 +953,27 @@ export default function Admin() {
                           )}
                         </div>
                       </form>
+
+                      {/* Branch-specific Danger Zone */}
+                      <div className="mt-8 pt-6 border-t border-red-100 dark:border-red-900/30">
+                        <h4 className="text-sm font-bold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
+                          <Trash2 size={16} />
+                          منطقة الخطر للفرع
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+                          سيتم حذف جميع الأصناف المسجلة لهذا الفرع فقط. هذا الإجراء لا يمكن التراجع عنه.
+                        </p>
+                        <button 
+                          onClick={() => {
+                            if (selectedBranchId && window.confirm(`هل أنت متأكد من رغبتك في حذف جميع أصناف المخزون لفرع ${branches.find(b => b.id === selectedBranchId)?.name}؟`)) {
+                              deleteBranchInventoryItems(selectedBranchId);
+                            }
+                          }}
+                          className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/50 hover:bg-red-100 dark:hover:bg-red-900/30 py-2 rounded-xl transition-colors text-sm font-bold flex items-center justify-center gap-2"
+                        >
+                          حذف جميع أصناف الفرع
+                        </button>
+                      </div>
                     </div>
                   </div>
 
