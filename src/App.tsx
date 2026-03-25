@@ -23,17 +23,11 @@ import SyncProgressBar from './components/SyncProgressBar';
 import { useStore, initTursoSync, GLOBAL_COLLECTIONS } from './store';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, allowNoUsers = false }: { children: React.ReactNode, allowNoUsers?: boolean }) => {
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const currentUser = useStore((state) => state.currentUser);
-  const users = useStore((state) => state.users);
   
   // If not logged in
   if (!currentUser) {
-    // If we allow access when no users exist (for setup)
-    if (allowNoUsers && users.length === 0) {
-      return <>{children}</>;
-    }
-    // Otherwise redirect to login
     return <Navigate to="/login" replace />;
   }
   
@@ -109,8 +103,8 @@ export default function App() {
               <Route path="car-handovers/return/:id" element={<ReturnCarHandover />} />
             </Route>
 
-            {/* Admin Routes - Allowed if no users exist (for setup) */}
-            <Route path="/admin/*" element={<ProtectedRoute allowNoUsers={true}><Layout /></ProtectedRoute>}>
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Admin />} />
               <Route path="*" element={<Admin />} />
             </Route>

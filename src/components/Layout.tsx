@@ -34,7 +34,7 @@ import { format, subDays, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Layout() {
-  const { currentUser, users, customRoles, logout, theme, setTheme, changeUserPin, revenueReports, inventoryReports, notifications, removeNotification } = useStore();
+  const { currentUser, customRoles, logout, theme, setTheme, changeUserPin, revenueReports, inventoryReports, notifications, removeNotification } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -76,7 +76,6 @@ export default function Layout() {
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
   const permissions = userRole?.permissions || [];
-  const noUsers = users.length === 0;
 
   const handleLogout = () => {
     logout();
@@ -164,19 +163,19 @@ export default function Layout() {
   };
 
   const navItems = [
-    { name: 'الرئيسية', path: '/', icon: LayoutDashboard, show: permissions.includes('view_all_branches') || noUsers },
-    { name: 'الإيرادات اليومية', path: '/revenue', icon: DollarSign, show: permissions.includes('view_revenue') || noUsers },
-    { name: 'جرد المخزون', path: '/inventory', icon: Package, show: permissions.includes('view_inventory') || noUsers },
-    { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: permissions.includes('view_scheduled') || noUsers },
-    { name: 'استلام السيارات', path: '/car-handovers', icon: Car, show: permissions.includes('view_car_handovers') || noUsers },
-    { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') || noUsers },
-    { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: permissions.includes('manage_system') || noUsers },
-    { name: 'طلبات التوريد', path: '/need-report', icon: AlertCircle, show: permissions.includes('view_need_report') || !permissions.includes('view_maintenance_only') || noUsers },
-    { name: 'تقارير الهدر', path: '/waste-report', icon: Trash2, show: permissions.includes('view_waste_report') || !permissions.includes('view_maintenance_only') || noUsers },
-    { name: 'تقارير التشغيل', path: '/inspection', icon: ClipboardCheck, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
-    { name: 'طلبات الصيانة', path: '/maintenance', icon: Wrench, show: !permissions.includes('view_inventory_only') || noUsers },
-    { name: 'طلبات الشراء', path: '/purchase', icon: ShoppingCart, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) || noUsers },
-    { name: 'لوحة الإدارة', path: '/admin', icon: Settings, show: permissions.includes('manage_system') || noUsers },
+    { name: 'الرئيسية', path: '/', icon: LayoutDashboard, show: permissions.includes('view_all_branches') },
+    { name: 'الإيرادات اليومية', path: '/revenue', icon: DollarSign, show: permissions.includes('view_revenue') },
+    { name: 'جرد المخزون', path: '/inventory', icon: Package, show: permissions.includes('view_inventory') },
+    { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: permissions.includes('view_scheduled') },
+    { name: 'استلام السيارات', path: '/car-handovers', icon: Car, show: permissions.includes('view_car_handovers') },
+    { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') },
+    { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: permissions.includes('manage_system') },
+    { name: 'طلبات التوريد', path: '/need-report', icon: AlertCircle, show: permissions.includes('view_need_report') || !permissions.includes('view_maintenance_only') },
+    { name: 'تقارير الهدر', path: '/waste-report', icon: Trash2, show: permissions.includes('view_waste_report') || !permissions.includes('view_maintenance_only') },
+    { name: 'تقارير التشغيل', path: '/inspection', icon: ClipboardCheck, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) },
+    { name: 'طلبات الصيانة', path: '/maintenance', icon: Wrench, show: !permissions.includes('view_inventory_only') },
+    { name: 'طلبات الشراء', path: '/purchase', icon: ShoppingCart, show: (!permissions.includes('view_maintenance_only') && !permissions.includes('view_inventory_only')) },
+    { name: 'لوحة الإدارة', path: '/admin', icon: Settings, show: permissions.includes('manage_system') },
   ];
 
   const filteredNavItems = navItems.filter(item => item.show);

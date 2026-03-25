@@ -81,7 +81,7 @@ export const initTursoSync = async (
   });
 
   // 3. Listen to Turso changes (Polling for now)
-  requiredCollections.forEach(col => {
+  const fetchPromises = requiredCollections.map(async (col) => {
     
     // Apply branch filter for branch managers
     const userRole = state.customRoles.find(r => r.id === currentUser?.roleId);
@@ -172,13 +172,15 @@ export const initTursoSync = async (
     };
 
     // Initial fetch
-    fetchRemoteData(true);
+    await fetchRemoteData(true);
     
     // Poll every 5 seconds
     const interval = setInterval(fetchRemoteData, 5000);
     activeListeners[col] = interval;
     console.log(`Subscribed to ${col}`);
   });
+
+  await Promise.all(fetchPromises);
 
   if (requiredCollections.length === 0 || requiredCollections.every(c => tursoLoadedCollections.has(c))) {
     state.setIsLoading(false);

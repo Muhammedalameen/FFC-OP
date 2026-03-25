@@ -56,7 +56,7 @@ export default function Admin() {
   const [copyTarget, setCopyTarget] = useState('');
 
   const userRole = currentUser ? customRoles.find(r => r.id === currentUser.roleId) : null;
-  const canManage = userRole?.permissions.includes('manage_system') || users.length === 0;
+  const canManage = userRole?.permissions.includes('manage_system');
 
   if (!canManage) {
     return <div className="p-8 text-center text-red-600 font-bold">غير مصرح لك بالدخول لهذه الصفحة</div>;
