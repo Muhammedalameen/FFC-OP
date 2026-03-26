@@ -686,15 +686,7 @@ const initialRoles: CustomRole[] = [
   { id: 'r6', name: 'سائق', permissions: ['view_cars', 'view_car_handovers', 'add_car_handovers'] },
 ];
 
-const initialUsers: User[] = [
-  {
-    id: 'u1',
-    employeeId: 'admin',
-    pin: '1234',
-    name: 'مدير النظام',
-    roleId: 'r1'
-  }
-];
+const initialUsers: User[] = [];
 
 const initialBranches: Branch[] = [];
 
