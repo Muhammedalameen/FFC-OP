@@ -168,7 +168,7 @@ export default function Layout() {
     { name: 'جرد المخزون', path: '/inventory', icon: Package, show: permissions.includes('view_inventory') },
     { name: 'القراءات المجدولة', path: '/scheduled-readings', icon: Clock, show: permissions.includes('view_scheduled') },
     { name: 'استلام السيارات', path: '/car-handovers', icon: Car, show: permissions.includes('view_car_handovers') },
-    { name: 'تقارير الإيرادات', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') },
+    { name: 'تقارير الإيرادات المجمعة', path: '/revenue-reports', icon: BarChart3, show: permissions.includes('view_revenue') },
     { name: 'تقارير الاستهلاك', path: '/reports', icon: BarChart3, show: permissions.includes('manage_system') },
     { name: 'طلبات التوريد', path: '/need-report', icon: AlertCircle, show: permissions.includes('view_need_report') || !permissions.includes('view_maintenance_only') },
     { name: 'تقارير الهدر', path: '/waste-report', icon: Trash2, show: permissions.includes('view_waste_report') || !permissions.includes('view_maintenance_only') },

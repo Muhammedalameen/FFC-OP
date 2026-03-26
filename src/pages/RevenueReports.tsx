@@ -69,7 +69,7 @@ export default function RevenueReports() {
     });
   }, [dateRange]);
 
-  const { stats, chartData } = useMemo(() => {
+  const { stats, chartData, branchBreakdown } = useMemo(() => {
     const filteredRevenue = revenueReports.filter(r => {
       const date = parseISO(r.date);
       const inRange = isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
@@ -79,10 +79,39 @@ export default function RevenueReports() {
     });
 
     // Revenue Calculations
-    const totalRevenue = filteredRevenue.reduce((sum, r) => 
-      sum + r.shifts.reduce((sSum, s) => sSum + s.cash + s.pos + s.delivery, 0), 0);
+    const totals = filteredRevenue.reduce((acc, r) => {
+      r.shifts.forEach(s => {
+        acc.cash += s.cash;
+        acc.pos += s.pos;
+        acc.delivery += s.delivery;
+      });
+      return acc;
+    }, { cash: 0, pos: 0, delivery: 0 });
+
+    const totalRevenue = totals.cash + totals.pos + totals.delivery;
     
     const daysDiff = Math.max(1, Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Branch Breakdown
+    const branchMap = filteredRevenue.reduce((acc, r) => {
+      const branchId = r.branchId;
+      if (!acc[branchId]) {
+        acc[branchId] = { cash: 0, pos: 0, delivery: 0, total: 0 };
+      }
+      r.shifts.forEach(s => {
+        acc[branchId].cash += s.cash;
+        acc[branchId].pos += s.pos;
+        acc[branchId].delivery += s.delivery;
+        acc[branchId].total += (s.cash + s.pos + s.delivery);
+      });
+      return acc;
+    }, {} as Record<string, { cash: number, pos: number, delivery: number, total: number }>);
+
+    const branchBreakdown = Object.entries(branchMap).map(([id, data]) => ({
+      id,
+      name: branches.find(b => b.id === id)?.name || 'فرع غير معروف',
+      ...data
+    })).sort((a, b) => b.total - a.total);
 
     // Chart Data
     const grouped = filteredRevenue.reduce((acc, r) => {
@@ -104,12 +133,16 @@ export default function RevenueReports() {
         revenue: {
           total: totalRevenue,
           daily: totalRevenue / daysDiff,
+          cash: totals.cash,
+          pos: totals.pos,
+          delivery: totals.delivery
         },
         days: daysDiff
       },
-      chartData
+      chartData,
+      branchBreakdown
     };
-  }, [revenueReports, appliedBranches, dateRange]);
+  }, [revenueReports, appliedBranches, dateRange, branches]);
 
   const toggleBranch = (id: string) => {
     if (id === 'all') {
@@ -146,22 +179,54 @@ export default function RevenueReports() {
     const branchNames = appliedBranches.includes('all') ? 'كافة الفروع' : branches.filter(b => appliedBranches.includes(b.id)).map(b => b.name).join(', ');
     const dateRangeStr = `${format(dateRange.start, 'yyyy-MM-dd')} إلى ${format(dateRange.end, 'yyyy-MM-dd')}`;
 
+    const branchRows = branchBreakdown.map(b => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${b.name}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${b.cash.toLocaleString()}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${b.pos.toLocaleString()}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${b.delivery.toLocaleString()}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">${b.total.toLocaleString()}</td>
+      </tr>
+    `).join('');
+
     const content = `
       <div dir="rtl" style="font-family: sans-serif; padding: 20px;">
-        <h1 style="text-align: center; color: #4f46e5;">تقرير الإيرادات</h1>
+        <h1 style="text-align: center; color: #4f46e5;">تقرير الإيرادات المجمعة</h1>
         <div style="margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
           <p><strong>الفروع:</strong> ${branchNames}</p>
           <p><strong>الفترة:</strong> ${dateRangeStr}</p>
           <p><strong>تاريخ الاستخراج:</strong> ${format(new Date(), 'yyyy-MM-dd hh:mm a')}</p>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr; gap: 40px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
           <div>
-            <h2 style="color: #059669; border-right: 4px solid #059669; padding-right: 10px;">الإيرادات</h2>
+            <h2 style="color: #059669; border-right: 4px solid #059669; padding-right: 10px;">إجمالي الإيرادات</h2>
             <p><strong>الإجمالي للفترة:</strong> ${stats.revenue.total.toLocaleString()} ر.س</p>
             <p><strong>المتوسط اليومي:</strong> ${stats.revenue.daily.toLocaleString()} ر.س</p>
           </div>
+          <div>
+            <h2 style="color: #4f46e5; border-right: 4px solid #4f46e5; padding-right: 10px;">تفاصيل الدفع</h2>
+            <p><strong>نقدي:</strong> ${stats.revenue.cash.toLocaleString()} ر.س</p>
+            <p><strong>نقاط البيع (POS):</strong> ${stats.revenue.pos.toLocaleString()} ر.س</p>
+            <p><strong>تطبيقات التوصيل:</strong> ${stats.revenue.delivery.toLocaleString()} ر.س</p>
+          </div>
         </div>
+
+        <h2 style="color: #1e293b; border-right: 4px solid #1e293b; padding-right: 10px;">تفاصيل الفروع</h2>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+          <thead>
+            <tr style="background: #f8fafc;">
+              <th style="text-align: right; padding: 10px; border-bottom: 2px solid #e2e8f0;">الفرع</th>
+              <th style="text-align: right; padding: 10px; border-bottom: 2px solid #e2e8f0;">نقدي</th>
+              <th style="text-align: right; padding: 10px; border-bottom: 2px solid #e2e8f0;">POS</th>
+              <th style="text-align: right; padding: 10px; border-bottom: 2px solid #e2e8f0;">توصيل</th>
+              <th style="text-align: right; padding: 10px; border-bottom: 2px solid #e2e8f0;">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${branchRows}
+          </tbody>
+        </table>
       </div>
     `;
     printReport(content);
@@ -170,7 +235,7 @@ export default function RevenueReports() {
   return (
     <div className="space-y-8" dir="rtl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">تقارير الإيرادات</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">تقارير الإيرادات المجمعة</h1>
         <div className="flex items-center gap-3">
           <button 
             onClick={handlePrint}
@@ -295,7 +360,7 @@ export default function RevenueReports() {
           <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
             <DollarSign size={20} />
           </div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">متوسط الإيرادات</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">ملخص الإيرادات</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -322,6 +387,30 @@ export default function RevenueReports() {
             isCount
           />
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ReportCard 
+            title="نقدي" 
+            value={stats.revenue.cash} 
+            subtitle="إجمالي المبالغ النقدية"
+            icon={<DollarSign size={24} />}
+            color="blue"
+          />
+          <ReportCard 
+            title="نقاط البيع (POS)" 
+            value={stats.revenue.pos} 
+            subtitle="إجمالي مبيعات الشبكة"
+            icon={<BarChart3 size={24} />}
+            color="violet"
+          />
+          <ReportCard 
+            title="تطبيقات التوصيل" 
+            value={stats.revenue.delivery} 
+            subtitle="إجمالي مبيعات التطبيقات"
+            icon={<BarChart3 size={24} />}
+            color="rose"
+          />
+        </div>
       </section>
 
       {/* Detailed Breakdown */}
@@ -335,7 +424,7 @@ export default function RevenueReports() {
             <p className="text-gray-500 dark:text-slate-400 text-sm">تحليل البيانات التاريخية للفروع</p>
           </div>
         </div>
-        <div className="h-80 w-full">
+        <div className="h-80 w-full mb-12">
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
@@ -378,6 +467,43 @@ export default function RevenueReports() {
               <p className="text-gray-400 dark:text-slate-600 italic">لا توجد بيانات كافية للعرض</p>
             </div>
           )}
+        </div>
+
+        {/* Branch Breakdown Table */}
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-6">
+            <Building2 size={20} className="text-indigo-600" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">تفاصيل الإيرادات حسب الفرع</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-slate-800">
+                  <th className="py-4 px-4 text-sm font-bold text-gray-500 dark:text-slate-400">الفرع</th>
+                  <th className="py-4 px-4 text-sm font-bold text-gray-500 dark:text-slate-400">نقدي</th>
+                  <th className="py-4 px-4 text-sm font-bold text-gray-500 dark:text-slate-400">POS</th>
+                  <th className="py-4 px-4 text-sm font-bold text-gray-500 dark:text-slate-400">توصيل</th>
+                  <th className="py-4 px-4 text-sm font-bold text-gray-500 dark:text-slate-400">الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
+                {branchBreakdown.map((branch) => (
+                  <tr key={branch.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-4 px-4 text-sm font-bold text-gray-900 dark:text-white">{branch.name}</td>
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-slate-400">{branch.cash.toLocaleString()} ر.س</td>
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-slate-400">{branch.pos.toLocaleString()} ر.س</td>
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-slate-400">{branch.delivery.toLocaleString()} ر.س</td>
+                    <td className="py-4 px-4 text-sm font-black text-indigo-600 dark:text-indigo-400">{branch.total.toLocaleString()} ر.س</td>
+                  </tr>
+                ))}
+                {branchBreakdown.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-400 italic">لا توجد بيانات للفروع المختارة</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
