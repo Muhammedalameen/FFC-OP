@@ -1,8 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
-import { db, initDb } from './server/db.js';
+import { db, initDb } from './server/db';
 
 const app = express();
 
@@ -10,7 +9,25 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // Initialize DB tables
-initDb().catch(err => console.error('Failed to initialize DB:', err));
+let dbInitialized = false;
+const ensureDb = async () => {
+  if (!dbInitialized) {
+    await initDb();
+    dbInitialized = true;
+  }
+};
+
+// Middleware to ensure DB is initialized
+app.use(async (req, res, next) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+  try {
+    await ensureDb();
+    next();
+  } catch (err) {
+    console.error('Failed to initialize DB:', err);
+    res.status(500).json({ error: 'Database initialization failed', details: err instanceof Error ? err.message : String(err) });
+  }
+});
 
 // API Routes for generic collections
 app.get('/api/:collection', async (req, res) => {
@@ -65,30 +82,30 @@ app.get('/api/health/ping', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Vite middleware for development
-async function setupVite() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+// Only setup Vite and Listen if NOT on Vercel
+if (!process.env.VERCEL) {
+  async function setupVite() {
+    const { createServer: createViteServer } = await import('vite');
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*all', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+    
+    const PORT = 3000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
-}
-
-setupVite();
-
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  const PORT = 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  setupVite();
 }
 
 export default app;
