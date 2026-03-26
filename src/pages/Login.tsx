@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { login, isDbConnected, checkDbConnection } = useStore();
+  const { login, isDbConnected, checkDbConnection, users, isLoading } = useStore();
   const navigate = useNavigate();
 
   const handleCheckConnection = async () => {
@@ -24,6 +24,11 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (users.length === 0 && !isLoading) {
+      setError('لا يوجد مستخدمين مسجلين في النظام. يرجى التواصل مع الإدارة.');
+      return;
+    }
+
     setIsLoggingIn(true);
     
     // Simulate network delay for the loading screen

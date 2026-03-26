@@ -164,6 +164,9 @@ export const initTursoSync = async (
           isReceivingFromTurso = true;
           useStore.setState({ [col]: remoteData } as any);
           isReceivingFromTurso = false;
+          if (col === 'users') {
+            console.log(`Successfully loaded ${remoteData.length} users from Turso.`);
+          }
         }
       } catch (error) {
         console.error(`Error fetching ${col}:`, error);
