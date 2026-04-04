@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -10,12 +13,25 @@ app.use(express.json({ limit: '50mb' }));
 
 // Initialize DB tables
 let dbInitialized = false;
+let dbInitError: Error | null = null;
+
 const ensureDb = async () => {
   if (!dbInitialized) {
     await initDb();
     dbInitialized = true;
   }
+  if (dbInitError) {
+    throw dbInitError;
+  }
 };
+
+// Health check (MUST be before DB initialization middleware)
+app.get('/api/health/ping', (req, res) => {
+  res.json({ 
+    status: dbInitError ? 'degraded' : 'ok',
+    dbError: dbInitError?.message || null
+  });
+});
 
 // Middleware to ensure DB is initialized
 app.use(async (req, res, next) => {
@@ -25,7 +41,12 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Failed to initialize DB:', err);
-    res.status(500).json({ error: 'Database initialization failed', details: err instanceof Error ? err.message : String(err) });
+    dbInitError = err as Error;
+    res.status(500).json({ 
+      error: 'Database initialization failed', 
+      details: err instanceof Error ? err.message : String(err),
+      hint: 'Check your Turso database URL and auth token in Vercel environment variables'
+    });
   }
 });
 

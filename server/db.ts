@@ -1,23 +1,42 @@
 import { createClient } from "@libsql/client";
 
+const dbUrl = process.env.TURSO_DATABASE_URL || "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io";
+const dbAuthToken = process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzQ0MDU4OTEsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.YaZPoGQp6rH_flN0oO6GmvQZW2sfhHAzM21RwVq-CcuXIP-U5KPGuXgnSl7_82-VZUtDpMAJCygWJWJX5WBiCw";
+
+console.log('[DB] Initializing Turso client...');
+console.log('[DB] URL:', dbUrl);
+console.log('[DB] AuthToken exists:', !!dbAuthToken);
+
 export const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io",
-  authToken: process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzQ0MDU4OTEsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.YaZPoGQp6rH_flN0oO6GmvQZW2sfhHAzM21RwVq-CcuXIP-U5KPGuXgnSl7_82-VZUtDpMAJCygWJWJX5WBiCw"
+  url: dbUrl,
+  authToken: dbAuthToken
 });
 
 export const initDb = async () => {
+  console.log('[DB] Starting database initialization...');
+  
+  // Test connection first
+  try {
+    await db.execute('SELECT 1');
+    console.log('[DB] Connection test successful');
+  } catch (err) {
+    console.error('[DB] Connection test failed:', err);
+    throw new Error(`Failed to connect to Turso database: ${err instanceof Error ? err.message : String(err)}. Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel environment variables.`);
+  }
+
   // Create tables if they don't exist
   // Since we are storing JSON objects from the frontend, we can use a generic key-value store approach
   // or a document store approach for simplicity, similar to Firebase.
-  
+
   const tables = [
-    'users', 'customRoles', 'branches', 'cars', 'inventoryItems', 
-    'operationalItems', 'revenueReports', 'inventoryReports', 
-    'inspectionReports', 'scheduledReadingItems', 'readingRecords', 
+    'users', 'customRoles', 'branches', 'cars', 'inventoryItems',
+    'operationalItems', 'revenueReports', 'inventoryReports',
+    'inspectionReports', 'scheduledReadingItems', 'readingRecords',
     'tickets', 'carHandovers'
   ];
 
   for (const table of tables) {
+    console.log(`[DB] Creating table: ${table}`);
     await db.execute(`
       CREATE TABLE IF NOT EXISTS ${table} (
         id TEXT PRIMARY KEY,
@@ -26,6 +45,7 @@ export const initDb = async () => {
       )
     `);
   }
+  console.log('[DB] All tables created/verified');
 
   // Seed default admin user if users table is empty or admin is missing
   try {
@@ -100,5 +120,5 @@ export const initDb = async () => {
     console.error("Error seeding data:", e);
   }
 
-  console.log("Database tables initialized.");
+  console.log("[DB] Database tables initialized successfully.");
 };
