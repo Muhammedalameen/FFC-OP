@@ -1,15 +1,8 @@
 import { createClient } from "@libsql/client";
 
-const dbUrl = process.env.TURSO_DATABASE_URL || "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io";
-const dbAuthToken = process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzQ0MDU4OTEsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.YaZPoGQp6rH_flN0oO6GmvQZW2sfhHAzM21RwVq-CcuXIP-U5KPGuXgnSl7_82-VZUtDpMAJCygWJWJX5WBiCw";
-
-console.log('[DB] Initializing Turso client...');
-console.log('[DB] URL:', dbUrl);
-console.log('[DB] AuthToken exists:', !!dbAuthToken);
-
 export const db = createClient({
-  url: dbUrl,
-  authToken: dbAuthToken
+  url: "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io",
+  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzUzMDExODgsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.gCZpSC_JinDmNz0yE9SO-qXZM_BMqhh99P1e8jvRznxQarszBMCcJYEfXNgGzywJP7sK_E-T8hv1Ga-lEqXZAg"
 });
 
 export const initDb = async () => {
