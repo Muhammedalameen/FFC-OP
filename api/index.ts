@@ -74,11 +74,19 @@ const initDb = async () => {
 
 // Vercel Function Handler
 export default async function handler(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  const pathname = url.pathname;
+  // Get pathname safely - Vercel provides just the path in request.url
+  const fullUrl = request.url || '';
+  let pathname: string;
+  try {
+    pathname = new URL(fullUrl).pathname;
+  } catch {
+    // If URL parsing fails, use the path directly
+    pathname = fullUrl.startsWith('/') ? fullUrl : '/' + fullUrl;
+  }
+  
   const method = request.method;
 
-  console.log(`[API] ${method} ${pathname}`);
+  console.log(`[API] ${method} ${pathname} (fullUrl: ${fullUrl})`);
 
   // CORS headers
   const corsHeaders = {
