@@ -1,8 +1,8 @@
 import { createClient } from "@libsql/client";
 
 export const db = createClient({
-  url: "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io",
-  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzQ0MDU4OTEsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.YaZPoGQp6rH_flN0oO6GmvQZW2sfhHAzM21RwVq-CcuXIP-U5KPGuXgnSl7_82-VZUtDpMAJCygWJWJX5WBiCw"
+  url: process.env.TURSO_DATABASE_URL || "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io",
+  authToken: process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzQ0MDU4OTEsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.YaZPoGQp6rH_flN0oO6GmvQZW2sfhHAzM21RwVq-CcuXIP-U5KPGuXgnSl7_82-VZUtDpMAJCygWJWJX5WBiCw"
 });
 
 export const initDb = async () => {
