@@ -1,20 +1,35 @@
 import { createClient } from "@libsql/client";
 
+// Use HTTPS for better compatibility with Vercel serverless
+const isVercel = !!process.env.VERCEL;
+const baseUrl = "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io";
+const httpUrl = "https://ffc-op-md1amin.aws-ap-northeast-1.turso.io";
+
 export const db = createClient({
-  url: "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io",
+  url: isVercel ? httpUrl : baseUrl,
   authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzUzMDExODgsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.gCZpSC_JinDmNz0yE9SO-qXZM_BMqhh99P1e8jvRznxQarszBMCcJYEfXNgGzywJP7sK_E-T8hv1Ga-lEqXZAg"
 });
 
 export const initDb = async () => {
   console.log('[DB] Starting database initialization...');
+  console.log('[DB] Node env:', process.env.NODE_ENV);
+  console.log('[DB] Vercel:', process.env.VERCEL || 'false');
+  console.log('[DB] Vercel runtime:', process.env.AWS_REGION ? 'AWS Lambda' : 'Other');
   
   // Test connection first
   try {
-    await db.execute('SELECT 1');
-    console.log('[DB] Connection test successful');
+    console.log('[DB] Testing connection...');
+    const result = await db.execute("SELECT 1");
+    console.log('[DB] ✅ Connection test successful:', result.rows);
   } catch (err) {
-    console.error('[DB] Connection test failed:', err);
-    throw new Error(`Failed to connect to Turso database: ${err instanceof Error ? err.message : String(err)}. Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel environment variables.`);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorStack = err instanceof Error ? err.stack : 'No stack';
+    console.error('[DB] ❌ Connection test failed!');
+    console.error('[DB] Error message:', errorMsg);
+    console.error('[DB] Error stack:', errorStack);
+    console.error('[DB] Error name:', err instanceof Error ? err.name : 'Unknown');
+    console.error('[DB] Error cause:', err instanceof Error && err.cause ? err.cause : 'No cause');
+    throw new Error(`Turso connection failed: ${errorMsg}`);
   }
 
   // Create tables if they don't exist
