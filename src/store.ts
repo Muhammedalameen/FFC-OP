@@ -9,8 +9,6 @@ import {
   getDocs,
   query,
   where,
-  onSnapshot,
-  Unsubscribe,
   Query
 } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -246,7 +244,8 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'approve_reports', name: 'الموافقة على التقارير', category: 'عام' },
 ];
 
-let firestoreUnsubscribers: Unsubscribe[] = [];
+// Note: Real-time listeners removed in favor of on-demand fetching
+// This prevents data conflicts when multiple users edit simultaneously
 
 export const useStore = create<AppState>()(
   persist(
@@ -703,7 +702,7 @@ export const useStore = create<AppState>()(
   )
 );
 
-// Initialize Firestore sync
+// Fetch data on-demand (not real-time)
 export const initFirestoreSync = async (
   targetCollections: string[] = GLOBAL_COLLECTIONS
 ) => {
@@ -717,7 +716,7 @@ export const initFirestoreSync = async (
   state.setIsLoading(true);
 
   try {
-    // Load collections
+    // Load collections (fetch once, not real-time)
     for (const col of requiredCollections) {
       const collectionRef = collection(db, col);
 
@@ -737,16 +736,16 @@ export const initFirestoreSync = async (
         q = query(collectionRef);
       }
 
-      // Set up real-time listener
-      const unsub = onSnapshot(q, (snapshot) => {
+      // Fetch data once (no real-time listener)
+      try {
+        const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         useStore.setState({ [col]: data } as any);
-      }, (error) => {
-        console.error(`Error listening to ${col}:`, error);
-        state.setSyncStatus(col, 'error', error.message);
-      });
-
-      firestoreUnsubscribers.push(unsub);
+        state.setSyncStatus(col, 'success');
+      } catch (error) {
+        console.error(`Error fetching ${col}:`, error);
+        state.setSyncStatus(col, 'error', error instanceof Error ? error.message : 'Unknown error');
+      }
     }
 
     state.setIsLoading(false);
