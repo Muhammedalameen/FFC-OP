@@ -205,7 +205,8 @@ export default function Admin() {
           alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
           return;
         }
-        const wb = XLSX.read(arrayBuffer, { type: 'array' });
+        const uint8Array = new Uint8Array(arrayBuffer as ArrayBuffer);
+        const wb = XLSX.read(uint8Array, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
