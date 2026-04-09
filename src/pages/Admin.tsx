@@ -194,10 +194,18 @@ export default function Admin() {
 
     abortImportRef.current = false;
     const reader = new FileReader();
+    reader.onerror = () => {
+      alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
+      console.error('File read error:', reader.error);
+    };
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const arrayBuffer = evt.target?.result;
+        if (!arrayBuffer) {
+          alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
+          return;
+        }
+        const wb = XLSX.read(arrayBuffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
@@ -271,7 +279,7 @@ export default function Admin() {
         fileInputRef.current.value = '';
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const togglePermission = (permId: string) => {
