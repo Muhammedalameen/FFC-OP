@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { db } from './firebase';
+import { db } from './lib/firebase';
 import {
   collection,
   doc,
