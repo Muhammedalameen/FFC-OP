@@ -138,6 +138,7 @@ export interface AppState {
   isDbConnected: boolean | null;
   theme: 'light' | 'dark' | 'system';
   syncStatus: Record<string, 'pending' | 'syncing' | 'success' | 'error'>;
+  syncStatuses: Record<string, boolean>;
   syncErrorMessages: Record<string, string>;
   syncProgress: { current: number; total: number } | null;
   notifications: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>;
@@ -157,51 +158,51 @@ export interface AppState {
 
   // CRUD operations
   addUser: (user: User) => Promise<void>;
-  updateUser: (user: User) => Promise<void>;
+  updateUser: (id: string, user: Omit<User, 'id'>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
 
   addRevenueReport: (report: RevenueReport) => Promise<void>;
-  updateRevenueReport: (report: RevenueReport) => Promise<void>;
+  updateRevenueReport: (id: string, report: Omit<RevenueReport, 'id'>) => Promise<void>;
   deleteRevenueReport: (reportId: string) => Promise<void>;
 
   addInventoryReport: (report: InventoryReport) => Promise<void>;
-  updateInventoryReport: (report: InventoryReport) => Promise<void>;
+  updateInventoryReport: (id: string, report: Omit<InventoryReport, 'id'>) => Promise<void>;
   deleteInventoryReport: (reportId: string) => Promise<void>;
 
   addInspectionReport: (report: InspectionReport) => Promise<void>;
-  updateInspectionReport: (report: InspectionReport) => Promise<void>;
+  updateInspectionReport: (id: string, report: Omit<InspectionReport, 'id'>) => Promise<void>;
   deleteInspectionReport: (reportId: string) => Promise<void>;
 
   addTicket: (ticket: Ticket) => Promise<void>;
-  updateTicket: (ticket: Ticket) => Promise<void>;
+  updateTicket: (id: string, ticket: Omit<Ticket, 'id'>) => Promise<void>;
   deleteTicket: (ticketId: string) => Promise<void>;
 
   addCarHandover: (handover: CarHandover) => Promise<void>;
-  updateCarHandover: (handover: CarHandover) => Promise<void>;
+  updateCarHandover: (id: string, handover: Omit<CarHandover, 'id'>) => Promise<void>;
   deleteCarHandover: (handoverId: string) => Promise<void>;
 
   addReadingRecord: (record: ReadingRecord) => Promise<void>;
-  updateReadingRecord: (record: ReadingRecord) => Promise<void>;
+  updateReadingRecord: (id: string, record: Omit<ReadingRecord, 'id'>) => Promise<void>;
   deleteReadingRecord: (recordId: string) => Promise<void>;
 
   addInventoryItem: (item: InventoryItem) => Promise<void>;
-  updateInventoryItem: (item: InventoryItem) => Promise<void>;
+  updateInventoryItem: (id: string, item: Omit<InventoryItem, 'id'>) => Promise<void>;
   deleteInventoryItem: (itemId: string) => Promise<void>;
 
   addBranch: (branch: Branch) => Promise<void>;
-  updateBranch: (branch: Branch) => Promise<void>;
+  updateBranch: (id: string, branch: Omit<Branch, 'id'>) => Promise<void>;
   deleteBranch: (branchId: string) => Promise<void>;
 
   addCar: (car: Car) => Promise<void>;
-  updateCar: (car: Car) => Promise<void>;
+  updateCar: (id: string, car: Omit<Car, 'id'>) => Promise<void>;
   deleteCar: (carId: string) => Promise<void>;
 
   addCustomRole: (role: CustomRole) => Promise<void>;
-  updateCustomRole: (role: CustomRole) => Promise<void>;
+  updateCustomRole: (id: string, role: Omit<CustomRole, 'id'>) => Promise<void>;
   deleteCustomRole: (roleId: string) => Promise<void>;
 
   addScheduledReadingItem: (item: ScheduledReadingItem) => Promise<void>;
-  updateScheduledReadingItem: (item: ScheduledReadingItem) => Promise<void>;
+  updateScheduledReadingItem: (id: string, item: Omit<ScheduledReadingItem, 'id'>) => Promise<void>;
   deleteScheduledReadingItem: (itemId: string) => Promise<void>;
 }
 
@@ -272,6 +273,7 @@ export const useStore = create<AppState>()(
       isDbConnected: null,
       theme: 'system',
       syncStatus: {},
+      syncStatuses: {},
       syncErrorMessages: {},
       syncProgress: null,
       notifications: [],
@@ -336,7 +338,7 @@ export const useStore = create<AppState>()(
           const sessionId = Math.random().toString(36).substr(2, 9);
 
           // Update user with session ID
-          await setDoc(doc(db, 'users', userData.id), { ...userData, sessionId });
+          await setDoc(doc(db, 'users', userData.id), { ...userData, sessionId }, { merge: true });
 
           set({ currentUser: userData, currentSessionId: sessionId });
           await get().checkDbConnection();
@@ -360,7 +362,9 @@ export const useStore = create<AppState>()(
       // CRUD operations
       addUser: async (user) => {
         try {
-          await setDoc(doc(db, 'users', user.id), user);
+          const userId = user.id || Date.now().toString();
+          const userWithId = { ...user, id: userId };
+          await setDoc(doc(db, 'users', userId), userWithId, { merge: true });
           get().addNotification('تم إضافة المستخدم بنجاح', 'success');
         } catch (e) {
           console.error('Error adding user:', e);
@@ -368,9 +372,9 @@ export const useStore = create<AppState>()(
           throw e;
         }
       },
-      updateUser: async (user) => {
+      updateUser: async (id, user) => {
         try {
-          await setDoc(doc(db, 'users', user.id), user);
+          await setDoc(doc(db, 'users', id), user, { merge: true });
           get().addNotification('تم تحديث المستخدم بنجاح', 'success');
         } catch (e) {
           console.error('Error updating user:', e);
@@ -391,7 +395,9 @@ export const useStore = create<AppState>()(
 
       addRevenueReport: async (report) => {
         try {
-          await setDoc(doc(db, 'revenueReports', report.id), report);
+          const reportId = report.id || Date.now().toString();
+          const reportWithId = { ...report, id: reportId };
+          await setDoc(doc(db, 'revenueReports', reportId), reportWithId, { merge: true });
           get().addNotification('تم إضافة التقرير بنجاح', 'success');
         } catch (e) {
           console.error('Error adding report:', e);
@@ -399,9 +405,9 @@ export const useStore = create<AppState>()(
           throw e;
         }
       },
-      updateRevenueReport: async (report) => {
+      updateRevenueReport: async (id, report) => {
         try {
-          await setDoc(doc(db, 'revenueReports', report.id), report);
+          await setDoc(doc(db, 'revenueReports', id), report, { merge: true });
           get().addNotification('تم تحديث التقرير بنجاح', 'success');
         } catch (e) {
           console.error('Error updating report:', e);
@@ -422,16 +428,18 @@ export const useStore = create<AppState>()(
 
       addInventoryReport: async (report) => {
         try {
-          await setDoc(doc(db, 'inventoryReports', report.id), report);
+          const reportId = report.id || Date.now().toString();
+          const reportWithId = { ...report, id: reportId };
+          await setDoc(doc(db, 'inventoryReports', reportId), reportWithId, { merge: true });
           get().addNotification('تم إضافة التقرير بنجاح', 'success');
         } catch (e) {
           console.error('Error adding report:', e);
           throw e;
         }
       },
-      updateInventoryReport: async (report) => {
+      updateInventoryReport: async (id, report) => {
         try {
-          await setDoc(doc(db, 'inventoryReports', report.id), report);
+          await setDoc(doc(db, 'inventoryReports', id), report, { merge: true });
         } catch (e) {
           console.error('Error updating report:', e);
           throw e;
@@ -448,15 +456,17 @@ export const useStore = create<AppState>()(
 
       addInspectionReport: async (report) => {
         try {
-          await setDoc(doc(db, 'inspectionReports', report.id), report);
+          const reportId = report.id || Date.now().toString();
+          const reportWithId = { ...report, id: reportId };
+          await setDoc(doc(db, 'inspectionReports', reportId), reportWithId, { merge: true });
         } catch (e) {
           console.error('Error adding report:', e);
           throw e;
         }
       },
-      updateInspectionReport: async (report) => {
+      updateInspectionReport: async (id, report) => {
         try {
-          await setDoc(doc(db, 'inspectionReports', report.id), report);
+          await setDoc(doc(db, 'inspectionReports', id), report, { merge: true });
         } catch (e) {
           console.error('Error updating report:', e);
           throw e;
@@ -473,15 +483,17 @@ export const useStore = create<AppState>()(
 
       addTicket: async (ticket) => {
         try {
-          await setDoc(doc(db, 'tickets', ticket.id), ticket);
+          const ticketId = ticket.id || Date.now().toString();
+          const ticketWithId = { ...ticket, id: ticketId };
+          await setDoc(doc(db, 'tickets', ticketId), ticketWithId, { merge: true });
         } catch (e) {
           console.error('Error adding ticket:', e);
           throw e;
         }
       },
-      updateTicket: async (ticket) => {
+      updateTicket: async (id, ticket) => {
         try {
-          await setDoc(doc(db, 'tickets', ticket.id), ticket);
+          await setDoc(doc(db, 'tickets', id), ticket, { merge: true });
         } catch (e) {
           console.error('Error updating ticket:', e);
           throw e;
@@ -498,15 +510,17 @@ export const useStore = create<AppState>()(
 
       addCarHandover: async (handover) => {
         try {
-          await setDoc(doc(db, 'carHandovers', handover.id), handover);
+          const handoverId = handover.id || Date.now().toString();
+          const handoverWithId = { ...handover, id: handoverId };
+          await setDoc(doc(db, 'carHandovers', handoverId), handoverWithId, { merge: true });
         } catch (e) {
           console.error('Error adding handover:', e);
           throw e;
         }
       },
-      updateCarHandover: async (handover) => {
+      updateCarHandover: async (id, handover) => {
         try {
-          await setDoc(doc(db, 'carHandovers', handover.id), handover);
+          await setDoc(doc(db, 'carHandovers', id), handover, { merge: true });
         } catch (e) {
           console.error('Error updating handover:', e);
           throw e;
@@ -523,15 +537,17 @@ export const useStore = create<AppState>()(
 
       addReadingRecord: async (record) => {
         try {
-          await setDoc(doc(db, 'readingRecords', record.id), record);
+          const recordId = record.id || Date.now().toString();
+          const recordWithId = { ...record, id: recordId };
+          await setDoc(doc(db, 'readingRecords', recordId), recordWithId, { merge: true });
         } catch (e) {
           console.error('Error adding record:', e);
           throw e;
         }
       },
-      updateReadingRecord: async (record) => {
+      updateReadingRecord: async (id, record) => {
         try {
-          await setDoc(doc(db, 'readingRecords', record.id), record);
+          await setDoc(doc(db, 'readingRecords', id), record, { merge: true });
         } catch (e) {
           console.error('Error updating record:', e);
           throw e;
@@ -548,15 +564,17 @@ export const useStore = create<AppState>()(
 
       addInventoryItem: async (item) => {
         try {
-          await setDoc(doc(db, 'inventoryItems', item.id), item);
+          const itemId = item.id || Date.now().toString();
+          const itemWithId = { ...item, id: itemId };
+          await setDoc(doc(db, 'inventoryItems', itemId), itemWithId, { merge: true });
         } catch (e) {
           console.error('Error adding item:', e);
           throw e;
         }
       },
-      updateInventoryItem: async (item) => {
+      updateInventoryItem: async (id, item) => {
         try {
-          await setDoc(doc(db, 'inventoryItems', item.id), item);
+          await setDoc(doc(db, 'inventoryItems', id), item, { merge: true });
         } catch (e) {
           console.error('Error updating item:', e);
           throw e;
@@ -573,15 +591,17 @@ export const useStore = create<AppState>()(
 
       addBranch: async (branch) => {
         try {
-          await setDoc(doc(db, 'branches', branch.id), branch);
+          const branchId = branch.id || Date.now().toString();
+          const branchWithId = { ...branch, id: branchId };
+          await setDoc(doc(db, 'branches', branchId), branchWithId, { merge: true });
         } catch (e) {
           console.error('Error adding branch:', e);
           throw e;
         }
       },
-      updateBranch: async (branch) => {
+      updateBranch: async (id, branch) => {
         try {
-          await setDoc(doc(db, 'branches', branch.id), branch);
+          await setDoc(doc(db, 'branches', id), branch, { merge: true });
         } catch (e) {
           console.error('Error updating branch:', e);
           throw e;
@@ -598,15 +618,17 @@ export const useStore = create<AppState>()(
 
       addCar: async (car) => {
         try {
-          await setDoc(doc(db, 'cars', car.id), car);
+          const carId = car.id || Date.now().toString();
+          const carWithId = { ...car, id: carId };
+          await setDoc(doc(db, 'cars', carId), carWithId, { merge: true });
         } catch (e) {
           console.error('Error adding car:', e);
           throw e;
         }
       },
-      updateCar: async (car) => {
+      updateCar: async (id, car) => {
         try {
-          await setDoc(doc(db, 'cars', car.id), car);
+          await setDoc(doc(db, 'cars', id), car, { merge: true });
         } catch (e) {
           console.error('Error updating car:', e);
           throw e;
@@ -623,15 +645,17 @@ export const useStore = create<AppState>()(
 
       addCustomRole: async (role) => {
         try {
-          await setDoc(doc(db, 'customRoles', role.id), role);
+          const roleId = role.id || Date.now().toString();
+          const roleWithId = { ...role, id: roleId };
+          await setDoc(doc(db, 'customRoles', roleId), roleWithId, { merge: true });
         } catch (e) {
           console.error('Error adding role:', e);
           throw e;
         }
       },
-      updateCustomRole: async (role) => {
+      updateCustomRole: async (id, role) => {
         try {
-          await setDoc(doc(db, 'customRoles', role.id), role);
+          await setDoc(doc(db, 'customRoles', id), role, { merge: true });
         } catch (e) {
           console.error('Error updating role:', e);
           throw e;
@@ -648,15 +672,17 @@ export const useStore = create<AppState>()(
 
       addScheduledReadingItem: async (item) => {
         try {
-          await setDoc(doc(db, 'scheduledReadingItems', item.id), item);
+          const itemId = item.id || Date.now().toString();
+          const itemWithId = { ...item, id: itemId };
+          await setDoc(doc(db, 'scheduledReadingItems', itemId), itemWithId, { merge: true });
         } catch (e) {
           console.error('Error adding item:', e);
           throw e;
         }
       },
-      updateScheduledReadingItem: async (item) => {
+      updateScheduledReadingItem: async (id, item) => {
         try {
-          await setDoc(doc(db, 'scheduledReadingItems', item.id), item);
+          await setDoc(doc(db, 'scheduledReadingItems', id), item, { merge: true });
         } catch (e) {
           console.error('Error updating item:', e);
           throw e;
@@ -744,7 +770,7 @@ const seedDefaultData = async () => {
       name: 'مدير النظام',
       roleId: 'r1'
     };
-    await setDoc(doc(db, 'users', adminUser.id), adminUser);
+    await setDoc(doc(db, 'users', adminUser.id), adminUser, { merge: true });
 
     // Create default roles
     const roles: CustomRole[] = [
@@ -789,7 +815,7 @@ const seedDefaultData = async () => {
     ];
 
     for (const role of roles) {
-      await setDoc(doc(db, 'customRoles', role.id), role);
+      await setDoc(doc(db, 'customRoles', role.id), role, { merge: true });
     }
 
     console.log('Default data seeded successfully');

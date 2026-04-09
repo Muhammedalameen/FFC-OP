@@ -68,7 +68,7 @@ export default function Admin() {
       updateUser(editingId, newUser);
       setEditingId(null);
     } else {
-      addUser(newUser);
+      addUser({ id: `u-${Date.now()}`, ...newUser });
     }
     setNewUser({ employeeId: '', pin: '', name: '', roleId: customRoles[0]?.id || '', branchId: '' });
   };
@@ -85,7 +85,7 @@ export default function Admin() {
       updateBranch(editingId, newBranch);
       setEditingId(null);
     } else {
-      addBranch(newBranch);
+      addBranch({ id: `branch-${Date.now()}`, ...newBranch });
     }
     setNewBranch({ name: '' });
   };
