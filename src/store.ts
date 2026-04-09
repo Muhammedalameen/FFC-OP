@@ -730,6 +730,9 @@ export const initFirestoreSync = async (
   }
 };
 
+// Alias for backward compatibility
+export const initTursoSync = initFirestoreSync;
+
 // Seed default data
 const seedDefaultData = async () => {
   try {
