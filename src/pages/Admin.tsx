@@ -200,13 +200,12 @@ export default function Admin() {
     };
     reader.onload = async (evt) => {
       try {
-        const arrayBuffer = evt.target?.result;
-        if (!arrayBuffer) {
+        const binaryString = evt.target?.result;
+        if (!binaryString) {
           alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
           return;
         }
-        const uint8Array = new Uint8Array(arrayBuffer as ArrayBuffer);
-        const wb = XLSX.read(uint8Array, { type: 'array' });
+        const wb = XLSX.read(binaryString, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
@@ -280,7 +279,7 @@ export default function Admin() {
         fileInputRef.current.value = '';
       }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsBinaryString(file);
   };
 
   const togglePermission = (permId: string) => {
