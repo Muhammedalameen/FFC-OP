@@ -4,8 +4,10 @@ import path from 'path';
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 
-// Load environment variables
-dotenv.config();
+// Load environment variables (only on local, not on Vercel)
+if (!process.env.VERCEL) {
+  dotenv.config();
+}
 
 // Database setup
 const dbUrl = process.env.TURSO_DB_URL || process.env.TURSO_CONNECTION_URL;
