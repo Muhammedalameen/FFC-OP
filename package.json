@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "ffc-management-system",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -44,7 +44,6 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0",
     "vite-plugin-pwa": "^1.2.0"
   }
 }
