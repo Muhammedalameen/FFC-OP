@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore, User, Branch, OperationalItem, InventoryItem, CustomRole, AVAILABLE_PERMISSIONS, ScheduledReadingItem, initTursoSync } from '../store';
 import { Users, Building2, ClipboardList, Package, Trash2, Plus, Save, Shield, ArrowRight, Clock, Upload, Car, Activity, CheckCircle2, XCircle, Loader2, Clock3 } from 'lucide-react';
+import Papa from 'papaparse';
 import Cars from './admin/Cars';
 
 export default function Admin() {
@@ -193,114 +194,124 @@ export default function Admin() {
 
     abortImportRef.current = false;
 
-    try {
-      // Use dynamic import to load XLSX
-      const XLSX = await import('xlsx');
+    // Accept both CSV and XLSX files (save Excel as CSV first)
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      alert('يرجى اختيار ملف CSV أو Excel صحيح.\n\nطريقة الحفظ:\n1. افتح الملف في Excel\n2. اضغط "حفظ باسم"\n3. اختر نوع الملف: CSV (.csv)');
+      return;
+    }
 
-      const reader = new FileReader();
-      reader.onerror = () => {
-        alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
-        console.error('File read error:', reader.error);
-      };
+    const reader = new FileReader();
+    reader.onerror = () => {
+      alert('حدث خطأ أثناء قراءة الملف.');
+      console.error('File read error:', reader.error);
+    };
 
-      reader.onload = async (evt) => {
-        try {
-          const binaryString = evt.target?.result;
-          if (!binaryString) {
-            alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
-            return;
-          }
-
-          const wb = XLSX.read(binaryString, { type: 'binary' });
-          const wsname = wb.SheetNames[0];
-          const ws = wb.Sheets[wsname];
-
-          // Parse with header: 1 to use first row as headers
-          const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-
-          if (data.length < 2) {
-            alert('الملف فارغ أو لا يحتوي على بيانات صالحة.');
-            return;
-          }
-
-          // Skip header row, process data rows
-          const validItems = data.slice(1).map((row: any[]) => {
-            // Column positions: A=0, B=1, C=2
-            const name = row[0];
-            const category = row[1];
-            const unit = row[2];
-
-            if (name && String(name).trim()) {
-              return {
-                name: String(name).trim(),
-                category: String(category || 'عام').trim(),
-                unit: String(unit || 'حبة').trim(),
-                branchIds: [selectedBranchId]
-              };
-            }
-            return null;
-          }).filter(Boolean) as Omit<InventoryItem, 'id'>[];
-
-          if (validItems.length === 0) {
-            alert('لم يتم العثور على أصناف صالحة في الملف.');
-            return;
-          }
-
-          // Filter out duplicates by name in the current branch
-          const existingInBranchNames = new Set(
-            inventoryItems
-              .filter(item => item.branchIds.includes(selectedBranchId))
-              .map(item => item.name.trim().toLowerCase())
-          );
-          const uniqueItemsToAdd: Omit<InventoryItem, 'id'>[] = [];
-          let duplicateCount = 0;
-          const seenInFile = new Set<string>();
-
-          validItems.forEach(item => {
-            const nameKey = item.name.toLowerCase();
-            if (existingInBranchNames.has(nameKey) || seenInFile.has(nameKey)) {
-              duplicateCount++;
-            } else {
-              seenInFile.add(nameKey);
-              uniqueItemsToAdd.push(item);
-            }
-          });
-
-          if (uniqueItemsToAdd.length === 0) {
-            alert(`تم تجاهل كافة الأصناف (${duplicateCount}) لأنها موجودة مسبقاً في هذا الفرع.`);
-            return;
-          }
-
-          // Add all items at once to ensure they are synced as a single batch
-          addInventoryItems(uniqueItemsToAdd);
-
-          if (!abortImportRef.current) {
-            setTimeout(() => {
-              let message = `تم استيراد ${uniqueItemsToAdd.length} صنف بنجاح.`;
-              if (duplicateCount > 0) {
-                message += `\nتم تجاهل ${duplicateCount} صنف لأنها موجودة مسبقاً في هذا الفرع.`;
-              }
-              alert(message);
-            }, 500);
-          }
-
-        } catch (error) {
-          console.error('Error parsing Excel file:', error);
-          alert('حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف Excel صالح.');
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        if (!text) {
+          alert('الملف فارغ.');
+          return;
         }
 
-        // Reset input
+        // Parse CSV using Papa Parse
+        Papa.parse(text, {
+          header: false,
+          skipEmptyLines: true,
+          complete: (results) => {
+            try {
+              const data = results.data as any[][];
+
+              if (data.length < 2) {
+                alert('الملف فارغ أو لا يحتوي على بيانات صالحة.');
+                return;
+              }
+
+              // Skip header row (first row), process data rows
+              const validItems = data.slice(1).map((row: any[]) => {
+                // Column positions: A=0 (name), B=1 (category), C=2 (unit)
+                const name = row[0];
+                const category = row[1];
+                const unit = row[2];
+
+                if (name && String(name).trim()) {
+                  return {
+                    name: String(name).trim(),
+                    category: String(category || 'عام').trim(),
+                    unit: String(unit || 'حبة').trim(),
+                    branchIds: [selectedBranchId]
+                  };
+                }
+                return null;
+              }).filter(Boolean) as Omit<InventoryItem, 'id'>[];
+
+              if (validItems.length === 0) {
+                alert('لم يتم العثور على أصناف صالحة في الملف.');
+                return;
+              }
+
+              // Filter out duplicates
+              const existingInBranchNames = new Set(
+                inventoryItems
+                  .filter(item => item.branchIds.includes(selectedBranchId))
+                  .map(item => item.name.trim().toLowerCase())
+              );
+              const uniqueItemsToAdd: Omit<InventoryItem, 'id'>[] = [];
+              let duplicateCount = 0;
+              const seenInFile = new Set<string>();
+
+              validItems.forEach(item => {
+                const nameKey = item.name.toLowerCase();
+                if (existingInBranchNames.has(nameKey) || seenInFile.has(nameKey)) {
+                  duplicateCount++;
+                } else {
+                  seenInFile.add(nameKey);
+                  uniqueItemsToAdd.push(item);
+                }
+              });
+
+              if (uniqueItemsToAdd.length === 0) {
+                alert(`تم تجاهل كافة الأصناف (${duplicateCount}) لأنها موجودة مسبقاً في هذا الفرع.`);
+                return;
+              }
+
+              // Add items
+              addInventoryItems(uniqueItemsToAdd);
+
+              if (!abortImportRef.current) {
+                setTimeout(() => {
+                  let message = `تم استيراد ${uniqueItemsToAdd.length} صنف بنجاح.`;
+                  if (duplicateCount > 0) {
+                    message += `\nتم تجاهل ${duplicateCount} صنف موجود مسبقاً.`;
+                  }
+                  alert(message);
+                }, 500);
+              }
+            } catch (error) {
+              console.error('Error processing CSV:', error);
+              alert('حدث خطأ أثناء معالجة البيانات.');
+            }
+
+            // Reset input
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+          },
+          error: (error) => {
+            console.error('Papa Parse error:', error);
+            alert('حدث خطأ أثناء قراءة الملف.');
+          }
+        });
+      } catch (error) {
+        console.error('Error reading file:', error);
+        alert('حدث خطأ أثناء قراءة الملف.');
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-      };
+      }
+    };
 
-      reader.readAsBinaryString(file);
-
-    } catch (error) {
-      console.error('Error loading XLSX library:', error);
-      alert('حدث خطأ في تحميل مكتبة Excel.');
-    }
+    reader.readAsText(file);
   };
 
   const togglePermission = (permId: string) => {
@@ -904,9 +915,9 @@ export default function Admin() {
                     </div>
                   </div>
                   <div>
-                    <input 
-                      type="file" 
-                      accept=".xlsx, .xls" 
+                    <input
+                      type="file"
+                      accept=".csv, .xlsx, .xls"
                       onChange={handleFileUpload} 
                       className="hidden" 
                       id="excel-upload" 
@@ -918,7 +929,7 @@ export default function Admin() {
                       className={`cursor-pointer px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors border ${syncProgress ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50'}`}
                     >
                       <Upload size={18} />
-                      <span className="hidden sm:inline">{syncProgress ? 'جاري الاستيراد...' : 'استيراد من Excel'}</span>
+                      <span className="hidden sm:inline">{syncProgress ? 'جاري الاستيراد...' : 'استيراد من CSV'}</span>
                     </label>
                   </div>
                 </div>
