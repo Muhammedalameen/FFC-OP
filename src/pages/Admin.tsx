@@ -208,18 +208,27 @@ export default function Admin() {
         const wb = XLSX.read(binaryString, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-        
-        const validItems = data.map((row: any) => {
-          const name = row['اسم الصنف'] || row['name'] || row['Name'] || row['الصنف'];
-          const category = row['مجموعة المنتج'] || row['التصنيف'] || row['category'] || row['Category'] || 'عام';
-          const unit = row['الوحدة'] || row['unit'] || row['Unit'] || 'حبة';
-          
-          if (name) {
+
+        // Parse with header: 1 to use first row as headers
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+        if (data.length < 2) {
+          alert('الملف فارغ أو لا يحتوي على بيانات صالحة.');
+          return;
+        }
+
+        // Skip header row, process data rows
+        const validItems = data.slice(1).map((row: any[]) => {
+          // Column positions: A=0, B=1, C=2
+          const name = row[0];
+          const category = row[1];
+          const unit = row[2];
+
+          if (name && String(name).trim()) {
             return {
               name: String(name).trim(),
-              category: String(category).trim(),
-              unit: String(unit).trim(),
+              category: String(category || 'عام').trim(),
+              unit: String(unit || 'حبة').trim(),
               branchIds: [selectedBranchId]
             };
           }
