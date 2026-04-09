@@ -1,129 +1,51 @@
-import express from 'express';
-import cors from 'cors';
-import path from 'path';
-import { db, initDb } from './server/db';
+import { createClient } from "@libsql/client";
+import dotenv from "dotenv";
 
-const app = express();
+dotenv.config();
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+// استخدام libsql:// بدلاً من https:// لسرعة أكبر في الاتصال
+const url = process.env.TURSO_DATABASE_URL || "libsql://ffc-op-md1amin.aws-ap-northeast-1.turso.io";
+const authToken = process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzUzMDExODgsImlkIjoiMDE5ZDIyZDMtZmUwMS03MDdhLWJhNDUtMWE5ZmRlOTUzYWFlIiwicmlkIjoiMDI2NjgxMGEtY2ZjYy00YzI2LThkZGQtYTQ0ZjkwYTBlZDRjIn0.gCZpSC_JinDmNz0yE9SO-qXZM_BMqhh99P1e8jvRznxQarszBMCcJYEfXNgGzywJP7sK_E-T8hv1Ga-lEqXZAg";
 
-// Initialize DB tables
-let dbInitialized = false;
-let dbInitError: Error | null = null;
-
-const ensureDb = async () => {
-  if (!dbInitialized) {
-    await initDb();
-    dbInitialized = true;
-  }
-  if (dbInitError) {
-    throw dbInitError;
-  }
-};
-
-// Health check (MUST be before DB initialization middleware)
-app.get('/api/health/ping', (req, res) => {
-  res.json({ 
-    status: dbInitError ? 'degraded' : 'ok',
-    dbError: dbInitError?.message || null
-  });
+export const db = createClient({
+  url: url,
+  authToken: authToken,
 });
 
-// Middleware to ensure DB is initialized
-app.use(async (req, res, next) => {
-  console.log(`[API] ${req.method} ${req.url}`);
-  try {
-    await ensureDb();
-    next();
-  } catch (err) {
-    console.error('Failed to initialize DB:', err);
-    dbInitError = err as Error;
-    res.status(500).json({ 
-      error: 'Database initialization failed', 
-      details: err instanceof Error ? err.message : String(err),
-      hint: 'Check your Turso database URL and auth token in Vercel environment variables'
-    });
-  }
-});
+let isInitialized = false;
 
-// API Routes for generic collections
-app.get('/api/:collection', async (req, res) => {
-  const { collection } = req.params;
-  try {
-    const result = await db.execute(`SELECT * FROM ${collection}`);
-    const data = result.rows.map(row => JSON.parse(row.data as string));
-    res.json(data);
-  } catch (error) {
-    console.error(`Error fetching ${collection}:`, error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/:collection', async (req, res) => {
-  const { collection } = req.params;
-  const body = req.body;
-  const id = body.id;
-  
-  if (!id) {
-    return res.status(400).json({ error: 'ID is required' });
-  }
+export const initDb = async (force = false) => {
+  // منع إعادة التشغيل في بيئة Serverless لتجنب الـ Timeout
+  if (isInitialized && !force) return;
 
   try {
-    await db.execute({
-      sql: `INSERT INTO ${collection} (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updatedAt = CURRENT_TIMESTAMP`,
-      args: [id, JSON.stringify(body)]
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error(`Error saving to ${collection}:`, error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+    console.log('[DB] Checking connection...');
+    await db.execute("SELECT 1");
 
-app.delete('/api/:collection/:id', async (req, res) => {
-  const { collection, id } = req.params;
-  try {
-    await db.execute({
-      sql: `DELETE FROM ${collection} WHERE id = ?`,
-      args: [id]
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error(`Error deleting from ${collection}:`, error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+    // نقوم بإنشاء الجداول فقط إذا طُلب ذلك (force) أو في البيئة المحلية
+    if (force || process.env.NODE_ENV !== 'production') {
+      const tables = [
+        'users', 'customRoles', 'branches', 'cars', 'inventoryItems',
+        'operationalItems', 'revenueReports', 'inventoryReports',
+        'inspectionReports', 'scheduledReadingItems', 'readingRecords',
+        'tickets', 'carHandovers'
+      ];
 
-// Health check
-app.get('/api/health/ping', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// Only setup Vite and Listen if NOT on Vercel
-if (!process.env.VERCEL) {
-  async function setupVite() {
-    const { createServer: createViteServer } = await import('vite');
-    if (process.env.NODE_ENV !== "production") {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa",
-      });
-      app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*all', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
+      for (const table of tables) {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS ${table} (
+            id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      }
+      console.log('[DB] Schema verified/created.');
     }
     
-    const PORT = 3000;
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
+    isInitialized = true;
+  } catch (err) {
+    console.error('[DB] Connection error:', err.message);
+    // لا نعطل السيرفر بالكامل، فقط نسجل الخطأ
   }
-  setupVite();
-}
-
-export default app;
+};
