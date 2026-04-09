@@ -135,6 +135,8 @@ export interface AppState {
   currentUser: User | null;
   currentSessionId: string;
   isLoading: boolean;
+  isDbConnected: boolean | null;
+  theme: 'light' | 'dark' | 'system';
   syncStatus: Record<string, 'pending' | 'syncing' | 'success' | 'error'>;
   syncErrorMessages: Record<string, string>;
   syncProgress: { current: number; total: number } | null;
@@ -145,9 +147,11 @@ export interface AppState {
   setSyncStatus: (collection: string, status: 'pending' | 'syncing' | 'success' | 'error', errorMessage?: string) => void;
   setSyncProgress: (progress: { current: number; total: number } | null) => void;
   addNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  checkDbConnection: () => Promise<void>;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
 
   // User actions
-  login: (user: User, sessionId: string) => void;
+  login: (employeeId: string, pin: string, rememberMe: boolean) => Promise<boolean>;
   logout: () => void;
   updateCurrentUser: (user: User) => void;
 
@@ -265,6 +269,8 @@ export const useStore = create<AppState>()(
       currentUser: null,
       currentSessionId: '',
       isLoading: false,
+      isDbConnected: null,
+      theme: 'system',
       syncStatus: {},
       syncErrorMessages: {},
       syncProgress: null,
@@ -279,6 +285,7 @@ export const useStore = create<AppState>()(
         }));
       },
       setSyncProgress: (progress) => set({ syncProgress: progress }),
+      setTheme: (theme) => set({ theme }),
       addNotification: (message, type = 'info') => {
         const notification = {
           id: Date.now().toString(),
@@ -295,9 +302,51 @@ export const useStore = create<AppState>()(
         }, 3000);
       },
 
+      checkDbConnection: async () => {
+        try {
+          set({ isDbConnected: null });
+          const usersRef = collection(db, 'users');
+          const snapshot = await getDocs(usersRef);
+
+          // Seed default data if no users exist
+          if (snapshot.empty) {
+            await seedDefaultData();
+          }
+
+          set({ isDbConnected: true });
+        } catch (error) {
+          console.error('Database connection failed:', error);
+          set({ isDbConnected: false });
+        }
+      },
+
       // User actions
-      login: (user, sessionId) => {
-        set({ currentUser: user, currentSessionId: sessionId });
+      login: async (employeeId, pin, rememberMe) => {
+        try {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('employeeId', '==', employeeId), where('pin', '==', pin));
+          const snapshot = await getDocs(q);
+
+          if (snapshot.empty) {
+            return false;
+          }
+
+          const userDoc = snapshot.docs[0];
+          const userData = userDoc.data() as User;
+          const sessionId = Math.random().toString(36).substr(2, 9);
+
+          // Update user with session ID
+          await setDoc(doc(db, 'users', userData.id), { ...userData, sessionId });
+
+          set({ currentUser: userData, currentSessionId: sessionId });
+          await get().checkDbConnection();
+          await initFirestoreSync();
+
+          return true;
+        } catch (error) {
+          console.error('Login error:', error);
+          return false;
+        }
       },
       logout: () => {
         set({ currentUser: null, currentSessionId: '' });
@@ -678,5 +727,70 @@ export const initFirestoreSync = async (
   } catch (error) {
     console.error('Error initializing Firestore sync:', error);
     state.setIsLoading(false);
+  }
+};
+
+// Seed default data
+const seedDefaultData = async () => {
+  try {
+    // Create default admin user
+    const adminUser: User = {
+      id: 'u1',
+      employeeId: 'admin',
+      pin: '1234',
+      name: 'مدير النظام',
+      roleId: 'r1'
+    };
+    await setDoc(doc(db, 'users', adminUser.id), adminUser);
+
+    // Create default roles
+    const roles: CustomRole[] = [
+      {
+        id: 'r1',
+        name: 'مدير نظام',
+        permissions: [
+          'view_all_branches', 'manage_system', 'add_reports', 'delete_reports', 'manage_tickets', 'approve_reports',
+          'view_revenue', 'add_revenue', 'edit_revenue', 'delete_revenue',
+          'view_inventory', 'add_inventory', 'edit_inventory', 'delete_inventory',
+          'view_scheduled', 'add_scheduled', 'edit_scheduled', 'delete_scheduled',
+          'view_maintenance', 'add_maintenance', 'edit_maintenance', 'delete_maintenance', 'approve_maintenance_cost',
+          'view_purchase', 'add_purchase', 'edit_purchase', 'delete_purchase',
+          'view_cars', 'manage_cars', 'view_car_handovers', 'add_car_handovers'
+        ]
+      },
+      {
+        id: 'r2',
+        name: 'مدير منطقة',
+        permissions: [
+          'view_all_branches', 'approve_reports', 'approve_maintenance_cost',
+          'view_revenue', 'view_inventory', 'view_scheduled', 'view_maintenance', 'view_purchase',
+          'view_cars', 'view_car_handovers'
+        ]
+      },
+      {
+        id: 'r3',
+        name: 'مدير فرع',
+        permissions: [
+          'add_reports',
+          'view_revenue', 'add_revenue',
+          'view_inventory', 'add_inventory',
+          'view_scheduled', 'add_scheduled',
+          'view_maintenance', 'add_maintenance',
+          'view_purchase', 'add_purchase',
+          'view_cars', 'view_car_handovers'
+        ]
+      },
+      { id: 'r4', name: 'مسؤول صيانة', permissions: ['view_maintenance', 'add_maintenance', 'edit_maintenance'] },
+      { id: 'r5', name: 'مسؤول مستودع', permissions: ['view_inventory', 'add_inventory'] },
+      { id: 'r6', name: 'سائق', permissions: ['view_cars', 'view_car_handovers', 'add_car_handovers'] },
+    ];
+
+    for (const role of roles) {
+      await setDoc(doc(db, 'customRoles', role.id), role);
+    }
+
+    console.log('Default data seeded successfully');
+  } catch (error) {
+    console.error('Error seeding default data:', error);
   }
 };

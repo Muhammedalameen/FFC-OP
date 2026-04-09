@@ -20,7 +20,7 @@ import NewCarHandover from './pages/NewCarHandover';
 import ReturnCarHandover from './pages/ReturnCarHandover';
 import LoadingScreen from './components/LoadingScreen';
 import SyncProgressBar from './components/SyncProgressBar';
-import { useStore, initTursoSync, GLOBAL_COLLECTIONS } from './store';
+import { useStore, initFirestoreSync, GLOBAL_COLLECTIONS } from './store';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -41,8 +41,8 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       await checkDbConnection();
-      await initTursoSync(GLOBAL_COLLECTIONS);
-      
+      await initFirestoreSync(GLOBAL_COLLECTIONS);
+
       // Add a small delay to show the nice animation
       setTimeout(() => {
         setIsInitialLoading(false);
